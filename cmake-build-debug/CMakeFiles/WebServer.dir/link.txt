@@ -1,1 +1,1 @@
-/usr/bin/cc -g   CMakeFiles/WebServer.dir/main.c.o  -o WebServer 
+/usr/bin/cc -g   CMakeFiles/WebServer.dir/main.c.o  -o WebServer -lpthread 

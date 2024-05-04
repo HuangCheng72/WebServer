@@ -5,7 +5,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+// 随便一个端口都行，只要没占用、没被防火墙拦截（所以需要在防火墙里面放行）就行。
 #define PORT 8080
+// 这里我需要解释一下，"/home/hc/web"是我的网站文件夹目录，可以随便修改，或者改成用参数接受不同的路径也可以。
 #define WEB_ROOT "/home/hc/web"
 
 void handle_http_request(int client_socket);
@@ -63,7 +65,7 @@ void handle_http_request(int client_socket) {
 
     // 响应头和响应内容
     char response[4096];
-    char content[2048];
+    char content[4096];
     int content_length = 0;
 
     // 拼接完整路径
@@ -80,16 +82,35 @@ void handle_http_request(int client_socket) {
     // 具体的对每个请求方法的处理策略
     if (strcasecmp(method, "GET") == 0) {
         if (file) {
-            content_length = fread(content, 1, sizeof(content), file);
+            //一种计算文件长度的方式
+            fseek(file, 0, SEEK_END);
+            content_length = ftell(file);
+            rewind(file);
             //格式输出到响应头
             sprintf(response, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n", content_length);
-            //发送响应头和内容
-            write(client_socket, response, strlen(response));
-            write(client_socket, content, content_length);
+            //发送响应头
+            if (write(client_socket, response, strlen(response)) == -1) {
+                perror("response_head");
+                close(client_socket);
+                return;
+            }
+            //循环保证内容发送完毕
+            while ((content_length = fread(content, 1, sizeof(content), file)) > 0) {
+                if (write(client_socket, content, content_length) == -1) {
+                    perror("response_content");
+                    close(client_socket);
+                    return;
+                }
+            }
         } else {
             char *error_message = "404 Not Found";
             sprintf(response, "HTTP/1.0 404 Not Found\r\nContent-Length: %zu\r\n\r\n%s", strlen(error_message), error_message);
-            write(client_socket, response, strlen(response));
+            //发送响应头
+            if (write(client_socket, response, strlen(response)) == -1) {
+                perror("response_head");
+                close(client_socket);
+                return;
+            }
         }
     } else if (strcasecmp(method, "HEAD") == 0) {
         if (file) {
@@ -101,33 +122,90 @@ void handle_http_request(int client_socket) {
             char *error_message = "404 Not Found";
             sprintf(response, "HTTP/1.0 404 Not Found\r\nContent-Length: %zu\r\n\r\n", strlen(error_message));
         }
-        write(client_socket, response, strlen(response));
+        //发送响应头
+        if (write(client_socket, response, strlen(response)) == -1) {
+            perror("response_head");
+            close(client_socket);
+            return;
+        }
     } else if (strcasecmp(method, "PUT") == 0) {
+        char *content_length_str = strstr(buffer, "Content-Length:");
+        if (content_length_str) {
+            sscanf(content_length_str, "Content-Length: %d", &content_length);
+        }
+        int content_read = 0;
         // PUT必然涉及到新建文件，所以要给写权限
         file = fopen(full_path, "w");
         if (file) {
-            char *body = strstr(buffer, "\r\n\r\n") + 4; //把字符串开头偏移到文件内容开头，这也就是为什么要有一个空行分割请求头和请求体的意义
-            fprintf(file, "%s", body);
-            fclose(file);
+            // 从buffer中定位到请求体开始的位置
+            char *body = strstr(buffer, "\r\n\r\n") + 4;     //把字符串开头偏移到文件内容开头，这也就是为什么要有一个空行分割请求头和请求体的意义
+            int body_length = bytes_read - (body - buffer);         // 已经读取的请求体长度
+            if (body_length < content_length) {                     // 如果已读取的请求体长度小于Content-Length，继续读取
+
+                // 首先，将已经在buffer中的请求体部分写入文件
+                fwrite(body, 1, body_length, file);
+                // 计算还需从客户端读取的数据量
+                int to_read = content_length - body_length;
+                // 当还有数据需要读取时，进入循环
+                while (to_read > 0) {
+                    // 确定一次读取的数据量，不超过content数组的大小，也不超过剩余需要读取的数据量
+                    int max_read_size = sizeof(content);
+                    if (max_read_size > to_read) {
+                        max_read_size = to_read;
+                    }
+                    // 从客户端读取数据
+                    content_read = read(client_socket, content, max_read_size);
+                    // 如果从客户端读到了数据
+                    if (content_read > 0) {
+                        // 将读取的数据写入文件
+                        fwrite(content, 1, content_read, file);
+                        // 减少剩余需要读取的数据量
+                        to_read -= content_read;
+                    } else {
+                        // 如果没有读到数据（content_read <= 0），则跳出循环
+                        // 这可能是因为客户端已关闭连接，或出现读取错误
+                        break;
+                    }
+                }
+            } else {
+                // 已经读取的部分足够长，直接写入
+                fwrite(body, 1, content_length, file);
+            }
             sprintf(response, "HTTP/1.0 201 Created\r\n\r\n");
         } else {
             sprintf(response, "HTTP/1.0 500 Internal Server Error\r\n\r\n");
         }
-        write(client_socket, response, strlen(response));
+        //发送响应头
+        if (write(client_socket, response, strlen(response)) == -1) {
+            perror("response_head");
+            close(client_socket);
+            return;
+        }
     } else if (strcasecmp(method, "DELETE") == 0) {
         if (remove(full_path) == 0) {
             sprintf(response, "HTTP/1.0 200 OK\r\n\r\n");
         } else {
             sprintf(response, "HTTP/1.0 404 Not Found\r\n\r\n");
         }
-        write(client_socket, response, strlen(response));
+        //发送响应头
+        if (write(client_socket, response, strlen(response)) == -1) {
+            perror("response_head");
+            close(client_socket);
+            return;
+        }
     } else {
         //没实现的请求方法就返回没实现的状态码501
         sprintf(response, "HTTP/1.0 501 Not Implemented\r\n\r\n");
-        write(client_socket, response, strlen(response));
+        //发送响应头
+        if (write(client_socket, response, strlen(response)) == -1) {
+            perror("response_head");
+            close(client_socket);
+            return;
+        }
     }
 
     if (file) {
+        //这里统一关闭文件
         fclose(file);
     }
 }

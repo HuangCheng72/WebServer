@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 // 随便一个端口都行，只要没占用、没被防火墙拦截（所以需要在防火墙里面放行）就行。
 #define PORT 8080
@@ -65,43 +68,34 @@ void handle_http_request(int client_socket) {
 
     // 响应头和响应内容
     char response[4096];
-    char content[4096];
-    int content_length = 0;
 
     // 拼接完整路径
     char full_path[1024];
     sprintf(full_path, "%s%s", WEB_ROOT, strcmp(path, "/") == 0 ? "/index.html" : path);    //因为/这种默认的情况一般都处理的是index，所以把这种情况默认处理了
 
-    // 如果不是PUT和DELETE，要操作文件，权限只能是读，不能是其他
-    // 所以，如果文件不存在，那file必然是0
-    FILE *file = NULL;
-    if (strcasecmp(method, "PUT") != 0 && strcasecmp(method, "DELETE") != 0) {
-        file = fopen(full_path, "r");
-    }
-
     // 具体的对每个请求方法的处理策略
     if (strcasecmp(method, "GET") == 0) {
+        // 同样是打开文件，这是Linux的系统调用，权限是只读
+        int file = open(full_path, O_RDONLY);
+
         if (file) {
-            //一种计算文件长度的方式
-            fseek(file, 0, SEEK_END);
-            content_length = ftell(file);
-            rewind(file);
+            // stat是Linux内核里面声明的一个结构体，Linux的文件的所有信息就存储在这样的一个结构体里面
+            struct stat stat_buf;
+            // 用系统调用，把文件的信息保存到我们刚刚创造的结构体临时变量里面
+            fstat(file, &stat_buf);
             //格式输出到响应头
-            sprintf(response, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n", content_length);
+            //stat_buf.st_size就是文件的大小属性，也就是我们要发送的内容长度
+            sprintf(response, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %ld\r\n\r\n", stat_buf.st_size);
             //发送响应头
             if (write(client_socket, response, strlen(response)) == -1) {
                 perror("response_head");
                 close(client_socket);
                 return;
             }
-            //循环保证内容发送完毕
-            while ((content_length = fread(content, 1, sizeof(content), file)) > 0) {
-                if (write(client_socket, content, content_length) == -1) {
-                    perror("response_content");
-                    close(client_socket);
-                    return;
-                }
-            }
+            //零拷贝直接发送文件
+            sendfile(client_socket, file, NULL, stat_buf.st_size);
+            //发送完毕，关闭文件
+            close(file);
         } else {
             char *error_message = "404 Not Found";
             sprintf(response, "HTTP/1.0 404 Not Found\r\nContent-Length: %zu\r\n\r\n%s", strlen(error_message), error_message);
@@ -112,87 +106,6 @@ void handle_http_request(int client_socket) {
                 return;
             }
         }
-    } else if (strcasecmp(method, "HEAD") == 0) {
-        if (file) {
-            //不读取文件计算文件长度的一种做法，搭配fseek和ftell
-            fseek(file, 0, SEEK_END);
-            content_length = ftell(file);
-            sprintf(response, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n", content_length);
-        } else {
-            char *error_message = "404 Not Found";
-            sprintf(response, "HTTP/1.0 404 Not Found\r\nContent-Length: %zu\r\n\r\n", strlen(error_message));
-        }
-        //发送响应头
-        if (write(client_socket, response, strlen(response)) == -1) {
-            perror("response_head");
-            close(client_socket);
-            return;
-        }
-    } else if (strcasecmp(method, "PUT") == 0) {
-        char *content_length_str = strstr(buffer, "Content-Length:");
-        if (content_length_str) {
-            sscanf(content_length_str, "Content-Length: %d", &content_length);
-        }
-        int content_read = 0;
-        // PUT必然涉及到新建文件，所以要给写权限
-        file = fopen(full_path, "w");
-        if (file) {
-            // 从buffer中定位到请求体开始的位置
-            char *body = strstr(buffer, "\r\n\r\n") + 4;     //把字符串开头偏移到文件内容开头，这也就是为什么要有一个空行分割请求头和请求体的意义
-            int body_length = bytes_read - (body - buffer);         // 已经读取的请求体长度
-            if (body_length < content_length) {                     // 如果已读取的请求体长度小于Content-Length，继续读取
-
-                // 首先，将已经在buffer中的请求体部分写入文件
-                fwrite(body, 1, body_length, file);
-                // 计算还需从客户端读取的数据量
-                int to_read = content_length - body_length;
-                // 当还有数据需要读取时，进入循环
-                while (to_read > 0) {
-                    // 确定一次读取的数据量，不超过content数组的大小，也不超过剩余需要读取的数据量
-                    int max_read_size = sizeof(content);
-                    if (max_read_size > to_read) {
-                        max_read_size = to_read;
-                    }
-                    // 从客户端读取数据
-                    content_read = read(client_socket, content, max_read_size);
-                    // 如果从客户端读到了数据
-                    if (content_read > 0) {
-                        // 将读取的数据写入文件
-                        fwrite(content, 1, content_read, file);
-                        // 减少剩余需要读取的数据量
-                        to_read -= content_read;
-                    } else {
-                        // 如果没有读到数据（content_read <= 0），则跳出循环
-                        // 这可能是因为客户端已关闭连接，或出现读取错误
-                        break;
-                    }
-                }
-            } else {
-                // 已经读取的部分足够长，直接写入
-                fwrite(body, 1, content_length, file);
-            }
-            sprintf(response, "HTTP/1.0 201 Created\r\n\r\n");
-        } else {
-            sprintf(response, "HTTP/1.0 500 Internal Server Error\r\n\r\n");
-        }
-        //发送响应头
-        if (write(client_socket, response, strlen(response)) == -1) {
-            perror("response_head");
-            close(client_socket);
-            return;
-        }
-    } else if (strcasecmp(method, "DELETE") == 0) {
-        if (remove(full_path) == 0) {
-            sprintf(response, "HTTP/1.0 200 OK\r\n\r\n");
-        } else {
-            sprintf(response, "HTTP/1.0 404 Not Found\r\n\r\n");
-        }
-        //发送响应头
-        if (write(client_socket, response, strlen(response)) == -1) {
-            perror("response_head");
-            close(client_socket);
-            return;
-        }
     } else {
         //没实现的请求方法就返回没实现的状态码501
         sprintf(response, "HTTP/1.0 501 Not Implemented\r\n\r\n");
@@ -202,10 +115,5 @@ void handle_http_request(int client_socket) {
             close(client_socket);
             return;
         }
-    }
-
-    if (file) {
-        //这里统一关闭文件
-        fclose(file);
     }
 }

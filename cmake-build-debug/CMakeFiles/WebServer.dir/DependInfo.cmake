@@ -4,9 +4,12 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_C
+  "/home/hc/WebServer/hashtable/hashtable.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/hashtable/hashtable.c.o"
   "/home/hc/WebServer/list/list.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/list/list.c.o"
   "/home/hc/WebServer/list/socketqueue.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/list/socketqueue.c.o"
   "/home/hc/WebServer/main.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/main.c.o"
+  "/home/hc/WebServer/tcppool/tcppool.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/tcppool/tcppool.c.o"
+  "/home/hc/WebServer/threadpool/threadpool.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/threadpool/threadpool.c.o"
   "/home/hc/WebServer/timer/timerthread.c" "/home/hc/WebServer/cmake-build-debug/CMakeFiles/WebServer.dir/timer/timerthread.c.o"
   )
 set(CMAKE_C_COMPILER_ID "GNU")

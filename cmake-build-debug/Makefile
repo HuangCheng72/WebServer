@@ -123,6 +123,33 @@ WebServer/fast:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/build
 .PHONY : WebServer/fast
 
+hashtable/hashtable.o: hashtable/hashtable.c.o
+
+.PHONY : hashtable/hashtable.o
+
+# target to build an object file
+hashtable/hashtable.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/hashtable/hashtable.c.o
+.PHONY : hashtable/hashtable.c.o
+
+hashtable/hashtable.i: hashtable/hashtable.c.i
+
+.PHONY : hashtable/hashtable.i
+
+# target to preprocess a source file
+hashtable/hashtable.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/hashtable/hashtable.c.i
+.PHONY : hashtable/hashtable.c.i
+
+hashtable/hashtable.s: hashtable/hashtable.c.s
+
+.PHONY : hashtable/hashtable.s
+
+# target to generate assembly for a file
+hashtable/hashtable.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/hashtable/hashtable.c.s
+.PHONY : hashtable/hashtable.c.s
+
 list/list.o: list/list.c.o
 
 .PHONY : list/list.o
@@ -204,6 +231,60 @@ main.c.s:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/main.c.s
 .PHONY : main.c.s
 
+tcppool/tcppool.o: tcppool/tcppool.c.o
+
+.PHONY : tcppool/tcppool.o
+
+# target to build an object file
+tcppool/tcppool.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/tcppool/tcppool.c.o
+.PHONY : tcppool/tcppool.c.o
+
+tcppool/tcppool.i: tcppool/tcppool.c.i
+
+.PHONY : tcppool/tcppool.i
+
+# target to preprocess a source file
+tcppool/tcppool.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/tcppool/tcppool.c.i
+.PHONY : tcppool/tcppool.c.i
+
+tcppool/tcppool.s: tcppool/tcppool.c.s
+
+.PHONY : tcppool/tcppool.s
+
+# target to generate assembly for a file
+tcppool/tcppool.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/tcppool/tcppool.c.s
+.PHONY : tcppool/tcppool.c.s
+
+threadpool/threadpool.o: threadpool/threadpool.c.o
+
+.PHONY : threadpool/threadpool.o
+
+# target to build an object file
+threadpool/threadpool.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpool.c.o
+.PHONY : threadpool/threadpool.c.o
+
+threadpool/threadpool.i: threadpool/threadpool.c.i
+
+.PHONY : threadpool/threadpool.i
+
+# target to preprocess a source file
+threadpool/threadpool.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpool.c.i
+.PHONY : threadpool/threadpool.c.i
+
+threadpool/threadpool.s: threadpool/threadpool.c.s
+
+.PHONY : threadpool/threadpool.s
+
+# target to generate assembly for a file
+threadpool/threadpool.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpool.c.s
+.PHONY : threadpool/threadpool.c.s
+
 timer/timerthread.o: timer/timerthread.c.o
 
 .PHONY : timer/timerthread.o
@@ -240,6 +321,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... WebServer"
 	@echo "... edit_cache"
+	@echo "... hashtable/hashtable.o"
+	@echo "... hashtable/hashtable.i"
+	@echo "... hashtable/hashtable.s"
 	@echo "... list/list.o"
 	@echo "... list/list.i"
 	@echo "... list/list.s"
@@ -249,6 +333,12 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... tcppool/tcppool.o"
+	@echo "... tcppool/tcppool.i"
+	@echo "... tcppool/tcppool.s"
+	@echo "... threadpool/threadpool.o"
+	@echo "... threadpool/threadpool.i"
+	@echo "... threadpool/threadpool.s"
 	@echo "... timer/timerthread.o"
 	@echo "... timer/timerthread.i"
 	@echo "... timer/timerthread.s"

@@ -84,6 +84,12 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/home/hc/WebServer/hashtable/hashtable.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/hashtable/hashtable.h">
+			<Option target="WebServer"/>
+		</Unit>
 		<Unit filename="/home/hc/WebServer/list/list.c">
 			<Option target="WebServer"/>
 		</Unit>
@@ -97,6 +103,18 @@
 			<Option target="WebServer"/>
 		</Unit>
 		<Unit filename="/home/hc/WebServer/main.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/tcppool/tcppool.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/tcppool/tcppool.h">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/threadpool/threadpool.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/threadpool/threadpool.h">
 			<Option target="WebServer"/>
 		</Unit>
 		<Unit filename="/home/hc/WebServer/timer/timerthread.c">

@@ -70,10 +70,15 @@ void AddThreadToIdleQueue(ThreadPool *pool, Thread *thread) {
 }
 
 // 线程安全扩展线程池，不得在线程池锁作用域内使用
-void ExpandThreadPool(ThreadPool *pool, void *(*pFunction)(void *), void *pArgs) {
+void ExpandThreadPool(ThreadPool *pool, int maxsize ,void *(*pFunction)(void *), void *pArgs) {
     pthread_mutex_lock(&pool->lock);
     if((pool->activecount + pool->idlecount) == 0){
         // 线程池是空的先放最基本的线程吧
+        pthread_mutex_unlock(&pool->lock);
+        return;
+    }
+    if((pool->activecount + pool->idlecount) >= maxsize){
+        // 达到上限不准再扩展了
         pthread_mutex_unlock(&pool->lock);
         return;
     }
@@ -83,6 +88,9 @@ void ExpandThreadPool(ThreadPool *pool, void *(*pFunction)(void *), void *pArgs)
         return;
     }
     int newThreadsCount = pool->activecount;  // 新增线程数等于当前工作线程数（加倍）
+    if(newThreadsCount + pool->activecount > maxsize) {
+        newThreadsCount = maxsize - pool->activecount;
+    }
     for (int i = 0; i < newThreadsCount; i++) {
         list_add_tail(&(CreateThread(pool, pFunction, pArgs)->node), &pool->idle_queue);
         pool->idlecount++;

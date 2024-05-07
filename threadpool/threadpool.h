@@ -66,10 +66,11 @@ void AddThreadToIdleQueue(ThreadPool *pool, Thread *thread);
 /**
  * 线程安全扩展线程池，必须离开线程池锁作用域使用
  * @param pool 指向线程池的指针
+ * @param maxsize 线程池最多扩展到同时管理多少个线程
  * @param pFunction 线程使用的工作函数
  * @param pArgs 工作函数所需的参数，一并传递，没参数就传递NULL
  */
-void ExpandThreadPool(ThreadPool *pool, void *(*pFunction)(void *), void *pArgs);
+void ExpandThreadPool(ThreadPool *pool, int maxsize ,void *(*pFunction)(void *), void *pArgs);
 
 /**
  * 线程安全缩减线程池，必须离开线程池锁作用域使用

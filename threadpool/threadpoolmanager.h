@@ -11,6 +11,7 @@
 // 线程管理配置结构体
 typedef struct ThreadPoolManagerConfig {
     ThreadPool *pool;               // 管理的线程池实例
+    int maxThreads;                 // 最大线程数（这个主要是防止过度消耗系统资源）
     int minIdleThreads;             // 最小空闲线程数
     int releasePeriod;              // 空闲线程释放周期（以秒为单位）
     void *(*workFunction)(void *);  // 处理函数

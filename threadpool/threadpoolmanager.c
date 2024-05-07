@@ -62,7 +62,7 @@ void *ThreadPoolManagerThread(void *arg) {
                 pthread_cond_signal(&thread->cond);
             }
             pthread_mutex_unlock(&config->pool->lock);
-            ExpandThreadPool(config->pool, config->workFunction, config->workFunctionArgs);
+            ExpandThreadPool(config->pool, config->maxThreads, config->workFunction, config->workFunctionArgs);
         }
 
         // 回收已完成工作的线程

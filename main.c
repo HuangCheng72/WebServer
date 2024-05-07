@@ -13,6 +13,7 @@
 #include "list/socketqueue.h"
 #include "tcppool/tcppool.h"
 #include "threadpool/threadpool.h"
+#include "threadpool/threadpoolmanager.h"
 
 // 随便一个端口都行，只要没占用、没被防火墙拦截（所以需要在防火墙里面放行）就行。
 #define PORT 8080
@@ -95,11 +96,19 @@ int main() {
     pthread_create(&tcppool_thread_id, NULL, tcppool_thread, pTCPPOOL);
     pthread_detach(tcppool_thread_id);
 
-    // 开启工作线程线程池管理线程
-    pthread_t handle_http_request_ThreadManagethread_id;
+    // 通用的线程池管理线程开启工作线程管理任务
+    pthread_t ThreadPoolManagerThread_id;
     ThreadPool *pThreadPool = CreateThreadPool(function);
-    pthread_create(&handle_http_request_ThreadManagethread_id, NULL, handle_http_request_ThreadManageThread, pThreadPool);
-    pthread_detach(handle_http_request_ThreadManagethread_id);
+    // 配置结构体
+    ThreadPoolManagerConfig *pConfig = (ThreadPoolManagerConfig *)malloc(sizeof(ThreadPoolManagerConfig));
+    pConfig->pool = pThreadPool;
+    pConfig->minIdleThreads = 10;
+    pConfig->releasePeriod = 60;
+    pConfig->workFunction = handle_http_request;
+    pConfig->workFunctionArgs = NULL;
+
+    pthread_create(&ThreadPoolManagerThread_id, NULL, ThreadPoolManagerThread, pConfig);
+    pthread_detach(ThreadPoolManagerThread_id);
 
     printf("Web server is running on port %d\n", PORT);
 
@@ -223,94 +232,4 @@ void handle_http_request() {
             return;
         }
     }
-}
-
-// HTTP处理线程管理的线程
-void *handle_http_request_ThreadManageThread(void *arg) {
-    // 接收到线程池实例
-    ThreadPool *pool = (ThreadPool *)arg;
-
-    // 注册当前线程到计时管理线程
-    TimerThreadControl *timer_ctrl = register_timer_thread(pthread_self());
-    // 存在依赖关系，不得不重试
-    while (!timer_ctrl) {
-        timer_ctrl = register_timer_thread(pthread_self());
-        if (!timer_ctrl) {
-            sleep(1);  // 睡眠1秒后重试
-        }
-    }
-
-    // 60秒尝试一次销毁线程
-    // 这个周期建议设置长一些
-    // 最起码一分钟以上，不然频繁销毁线程对系统性能影响也很大
-    int count = 60;
-
-    // 如果线程池线程小于10个，增加到10个。
-    while(pool->idlecount < 10) {
-        AddThreadToIdleQueue(pool, CreateThread(pool, handle_http_request, NULL));
-    }
-
-    while (1) {
-
-        // 等待计时器线程的信号，阻塞时间极短，可以认为是非阻塞方式
-        struct timespec now;
-        clock_gettime(CLOCK_REALTIME, &now); // 获取当前时间
-
-        pthread_mutex_lock(timer_ctrl->mutex);
-        // 设置超时时间为当前时间，即不等待
-        int wait_result = pthread_cond_timedwait(timer_ctrl->cond, timer_ctrl->mutex, &now);
-        pthread_mutex_unlock(timer_ctrl->mutex);
-
-        if(wait_result == 0) {
-            count--;
-        }
-        if(count == 0) {
-            // 因为ShrinkThreadPool这东西用了线程池锁保证安全，所以只能离开锁的作用域使用
-            ShrinkThreadPool(pool, 10);
-            // 60s销毁一次
-            count = 60;
-        }
-
-        if (pool->pShouldAssignWork()) {
-            pthread_mutex_lock(&pool->lock);
-            // 查看空闲队列是否有线程
-            if (!list_empty(&pool->idle_queue)) {
-                LIST_NODE *node = pool->idle_queue.next;
-                Thread *thread = list_entry(node, Thread, node);
-                list_del(node);  // 从空闲队列中移除
-                pool->idlecount--;    //计数自减
-                thread->is_working = 1;
-                list_add_tail(node, &pool->work_queue);  // 添加到工作队列
-                pool->activecount++;    //计数自增
-                pthread_cond_signal(&thread->cond); // 触发线程开始工作
-            }
-
-            pthread_mutex_unlock(&pool->lock);
-            // 这里后续要考虑增加处理线程和减少处理线程的问题
-            // 因为ExpandThreadPool这东西用了线程池锁保证安全，所以只能离开锁的作用域使用
-            ExpandThreadPool(pool, handle_http_request, NULL);
-        }
-        // 回收是必须要做的工作，无论如何都要尝试回收一遍
-        // 回收已完成工作的线程
-        pthread_mutex_lock(&pool->lock);
-        LIST_NODE *pos, *n;
-        list_for_each_safe(pos, n, &pool->work_queue) {
-            Thread *thread = list_entry(pos, Thread, node);
-            // 把线程标记为空闲
-            pthread_mutex_lock(&thread->mutex);
-            if (!thread->is_working) {  // 如果线程已完成工作
-                list_del(pos);          // 从工作队列移除
-                pool->activecount--;    //计数自减
-                list_add_tail(pos, &pool->idle_queue);  // 加入空闲队列
-                pool->idlecount++;      //计数自增
-            }
-            pthread_mutex_unlock(&thread->mutex);
-        }
-
-        pthread_mutex_unlock(&pool->lock);
-    }
-    //回收所有资源
-    destroyThreadPool(pool);
-
-    return NULL;
 }

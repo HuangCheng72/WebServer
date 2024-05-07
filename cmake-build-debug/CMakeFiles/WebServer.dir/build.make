@@ -81,17 +81,95 @@ CMakeFiles/WebServer.dir/main.c.o.provides: CMakeFiles/WebServer.dir/main.c.o.re
 CMakeFiles/WebServer.dir/main.c.o.provides.build: CMakeFiles/WebServer.dir/main.c.o
 
 
+CMakeFiles/WebServer.dir/list/list.c.o: CMakeFiles/WebServer.dir/flags.make
+CMakeFiles/WebServer.dir/list/list.c.o: ../list/list.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/hc/WebServer/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building C object CMakeFiles/WebServer.dir/list/list.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/WebServer.dir/list/list.c.o   -c /home/hc/WebServer/list/list.c
+
+CMakeFiles/WebServer.dir/list/list.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/WebServer.dir/list/list.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/hc/WebServer/list/list.c > CMakeFiles/WebServer.dir/list/list.c.i
+
+CMakeFiles/WebServer.dir/list/list.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/WebServer.dir/list/list.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/hc/WebServer/list/list.c -o CMakeFiles/WebServer.dir/list/list.c.s
+
+CMakeFiles/WebServer.dir/list/list.c.o.requires:
+
+.PHONY : CMakeFiles/WebServer.dir/list/list.c.o.requires
+
+CMakeFiles/WebServer.dir/list/list.c.o.provides: CMakeFiles/WebServer.dir/list/list.c.o.requires
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/list.c.o.provides.build
+.PHONY : CMakeFiles/WebServer.dir/list/list.c.o.provides
+
+CMakeFiles/WebServer.dir/list/list.c.o.provides.build: CMakeFiles/WebServer.dir/list/list.c.o
+
+
+CMakeFiles/WebServer.dir/timer/timerthread.c.o: CMakeFiles/WebServer.dir/flags.make
+CMakeFiles/WebServer.dir/timer/timerthread.c.o: ../timer/timerthread.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/hc/WebServer/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building C object CMakeFiles/WebServer.dir/timer/timerthread.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/WebServer.dir/timer/timerthread.c.o   -c /home/hc/WebServer/timer/timerthread.c
+
+CMakeFiles/WebServer.dir/timer/timerthread.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/WebServer.dir/timer/timerthread.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/hc/WebServer/timer/timerthread.c > CMakeFiles/WebServer.dir/timer/timerthread.c.i
+
+CMakeFiles/WebServer.dir/timer/timerthread.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/WebServer.dir/timer/timerthread.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/hc/WebServer/timer/timerthread.c -o CMakeFiles/WebServer.dir/timer/timerthread.c.s
+
+CMakeFiles/WebServer.dir/timer/timerthread.c.o.requires:
+
+.PHONY : CMakeFiles/WebServer.dir/timer/timerthread.c.o.requires
+
+CMakeFiles/WebServer.dir/timer/timerthread.c.o.provides: CMakeFiles/WebServer.dir/timer/timerthread.c.o.requires
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/timer/timerthread.c.o.provides.build
+.PHONY : CMakeFiles/WebServer.dir/timer/timerthread.c.o.provides
+
+CMakeFiles/WebServer.dir/timer/timerthread.c.o.provides.build: CMakeFiles/WebServer.dir/timer/timerthread.c.o
+
+
+CMakeFiles/WebServer.dir/list/socketqueue.c.o: CMakeFiles/WebServer.dir/flags.make
+CMakeFiles/WebServer.dir/list/socketqueue.c.o: ../list/socketqueue.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/hc/WebServer/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object CMakeFiles/WebServer.dir/list/socketqueue.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/WebServer.dir/list/socketqueue.c.o   -c /home/hc/WebServer/list/socketqueue.c
+
+CMakeFiles/WebServer.dir/list/socketqueue.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/WebServer.dir/list/socketqueue.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/hc/WebServer/list/socketqueue.c > CMakeFiles/WebServer.dir/list/socketqueue.c.i
+
+CMakeFiles/WebServer.dir/list/socketqueue.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/WebServer.dir/list/socketqueue.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/hc/WebServer/list/socketqueue.c -o CMakeFiles/WebServer.dir/list/socketqueue.c.s
+
+CMakeFiles/WebServer.dir/list/socketqueue.c.o.requires:
+
+.PHONY : CMakeFiles/WebServer.dir/list/socketqueue.c.o.requires
+
+CMakeFiles/WebServer.dir/list/socketqueue.c.o.provides: CMakeFiles/WebServer.dir/list/socketqueue.c.o.requires
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/socketqueue.c.o.provides.build
+.PHONY : CMakeFiles/WebServer.dir/list/socketqueue.c.o.provides
+
+CMakeFiles/WebServer.dir/list/socketqueue.c.o.provides.build: CMakeFiles/WebServer.dir/list/socketqueue.c.o
+
+
 # Object files for target WebServer
 WebServer_OBJECTS = \
-"CMakeFiles/WebServer.dir/main.c.o"
+"CMakeFiles/WebServer.dir/main.c.o" \
+"CMakeFiles/WebServer.dir/list/list.c.o" \
+"CMakeFiles/WebServer.dir/timer/timerthread.c.o" \
+"CMakeFiles/WebServer.dir/list/socketqueue.c.o"
 
 # External object files for target WebServer
 WebServer_EXTERNAL_OBJECTS =
 
 WebServer: CMakeFiles/WebServer.dir/main.c.o
+WebServer: CMakeFiles/WebServer.dir/list/list.c.o
+WebServer: CMakeFiles/WebServer.dir/timer/timerthread.c.o
+WebServer: CMakeFiles/WebServer.dir/list/socketqueue.c.o
 WebServer: CMakeFiles/WebServer.dir/build.make
 WebServer: CMakeFiles/WebServer.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/hc/WebServer/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking C executable WebServer"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/hc/WebServer/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking C executable WebServer"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/WebServer.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -100,6 +178,9 @@ CMakeFiles/WebServer.dir/build: WebServer
 .PHONY : CMakeFiles/WebServer.dir/build
 
 CMakeFiles/WebServer.dir/requires: CMakeFiles/WebServer.dir/main.c.o.requires
+CMakeFiles/WebServer.dir/requires: CMakeFiles/WebServer.dir/list/list.c.o.requires
+CMakeFiles/WebServer.dir/requires: CMakeFiles/WebServer.dir/timer/timerthread.c.o.requires
+CMakeFiles/WebServer.dir/requires: CMakeFiles/WebServer.dir/list/socketqueue.c.o.requires
 
 .PHONY : CMakeFiles/WebServer.dir/requires
 

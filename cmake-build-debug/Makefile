@@ -123,6 +123,60 @@ WebServer/fast:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/build
 .PHONY : WebServer/fast
 
+list/list.o: list/list.c.o
+
+.PHONY : list/list.o
+
+# target to build an object file
+list/list.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/list.c.o
+.PHONY : list/list.c.o
+
+list/list.i: list/list.c.i
+
+.PHONY : list/list.i
+
+# target to preprocess a source file
+list/list.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/list.c.i
+.PHONY : list/list.c.i
+
+list/list.s: list/list.c.s
+
+.PHONY : list/list.s
+
+# target to generate assembly for a file
+list/list.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/list.c.s
+.PHONY : list/list.c.s
+
+list/socketqueue.o: list/socketqueue.c.o
+
+.PHONY : list/socketqueue.o
+
+# target to build an object file
+list/socketqueue.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/socketqueue.c.o
+.PHONY : list/socketqueue.c.o
+
+list/socketqueue.i: list/socketqueue.c.i
+
+.PHONY : list/socketqueue.i
+
+# target to preprocess a source file
+list/socketqueue.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/socketqueue.c.i
+.PHONY : list/socketqueue.c.i
+
+list/socketqueue.s: list/socketqueue.c.s
+
+.PHONY : list/socketqueue.s
+
+# target to generate assembly for a file
+list/socketqueue.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/socketqueue.c.s
+.PHONY : list/socketqueue.c.s
+
 main.o: main.c.o
 
 .PHONY : main.o
@@ -150,6 +204,33 @@ main.c.s:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/main.c.s
 .PHONY : main.c.s
 
+timer/timerthread.o: timer/timerthread.c.o
+
+.PHONY : timer/timerthread.o
+
+# target to build an object file
+timer/timerthread.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/timer/timerthread.c.o
+.PHONY : timer/timerthread.c.o
+
+timer/timerthread.i: timer/timerthread.c.i
+
+.PHONY : timer/timerthread.i
+
+# target to preprocess a source file
+timer/timerthread.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/timer/timerthread.c.i
+.PHONY : timer/timerthread.c.i
+
+timer/timerthread.s: timer/timerthread.c.s
+
+.PHONY : timer/timerthread.s
+
+# target to generate assembly for a file
+timer/timerthread.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/timer/timerthread.c.s
+.PHONY : timer/timerthread.c.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -159,9 +240,18 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... WebServer"
 	@echo "... edit_cache"
+	@echo "... list/list.o"
+	@echo "... list/list.i"
+	@echo "... list/list.s"
+	@echo "... list/socketqueue.o"
+	@echo "... list/socketqueue.i"
+	@echo "... list/socketqueue.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... timer/timerthread.o"
+	@echo "... timer/timerthread.i"
+	@echo "... timer/timerthread.s"
 .PHONY : help
 
 

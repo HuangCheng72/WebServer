@@ -84,7 +84,25 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/home/hc/WebServer/list/list.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/list/list.h">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/list/socketqueue.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/list/socketqueue.h">
+			<Option target="WebServer"/>
+		</Unit>
 		<Unit filename="/home/hc/WebServer/main.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/timer/timerthread.c">
+			<Option target="WebServer"/>
+		</Unit>
+		<Unit filename="/home/hc/WebServer/timer/timerthread.h">
 			<Option target="WebServer"/>
 		</Unit>
 		<Unit filename="/home/hc/WebServer/CMakeLists.txt">

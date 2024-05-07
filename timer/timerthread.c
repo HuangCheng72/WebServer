@@ -6,7 +6,8 @@
 
 // 用链表记录订阅了计时信息的线程信息
 LIST_HEAD(timerthread_list_head);
-pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
+// 只用于计时管理线程的锁，在名字上区分
+pthread_mutex_t timer_global_lock = PTHREAD_MUTEX_INITIALIZER;
 
 TimerThreadControl *register_timer_thread(pthread_t id) {
     TimerThreadControl *ctrl = malloc(sizeof(TimerThreadControl));
@@ -21,21 +22,21 @@ TimerThreadControl *register_timer_thread(pthread_t id) {
     pthread_cond_init(ctrl->cond, NULL);
     pthread_mutex_init(ctrl->mutex, NULL);
 
-    pthread_mutex_lock(&global_lock);
+    pthread_mutex_lock(&timer_global_lock);
     list_add_tail(&ctrl->node, &timerthread_list_head);
-    pthread_mutex_unlock(&global_lock);
+    pthread_mutex_unlock(&timer_global_lock);
     return ctrl;
 }
 
 void unregister_timer_thread(TimerThreadControl *pTimer_Ctl) {
-    pthread_mutex_lock(&global_lock);
+    pthread_mutex_lock(&timer_global_lock);
     list_del(&pTimer_Ctl->node);
     pthread_cond_destroy(pTimer_Ctl->cond);
     pthread_mutex_destroy(pTimer_Ctl->mutex);
     free(pTimer_Ctl->cond);
     free(pTimer_Ctl->mutex);
     free(pTimer_Ctl);
-    pthread_mutex_unlock(&global_lock);
+    pthread_mutex_unlock(&timer_global_lock);
 }
 
 void *timer_thread(void *arg) {
@@ -57,13 +58,13 @@ void *timer_thread(void *arg) {
             last_time = current_time;
 
             // 向所有注册的线程发出通知
-            pthread_mutex_lock(&global_lock);
+            pthread_mutex_lock(&timer_global_lock);
             LIST_NODE *pos;
             list_for_each(pos, &timerthread_list_head) {
                 TimerThreadControl *ctrl = list_entry(pos, TimerThreadControl, node);
                 pthread_cond_signal(ctrl->cond);  // 发送通知
             }
-            pthread_mutex_unlock(&global_lock);
+            pthread_mutex_unlock(&timer_global_lock);
         }
     }
 }

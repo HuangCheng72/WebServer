@@ -102,6 +102,7 @@ int main() {
     // 配置结构体
     ThreadPoolManagerConfig *pConfig = (ThreadPoolManagerConfig *)malloc(sizeof(ThreadPoolManagerConfig));
     pConfig->pool = pThreadPool;
+    pConfig->maxThreads = 256;
     pConfig->minIdleThreads = 10;
     pConfig->releasePeriod = 60;
     pConfig->workFunction = handle_http_request;

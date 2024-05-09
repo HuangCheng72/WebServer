@@ -32,7 +32,7 @@ void *ThreadFunctionWrapper(void *arg) {
         }
         pthread_mutex_unlock(&pt->mutex);
 
-        if (pt->pFunction) {  // 检查工作函数是否存在并执行
+        if (pt->pFunction  && pt->is_working) {  // 检查工作函数是否存在，再次确认是否应该工作了并执行
             pt->pFunction(pt->pArgs);
         }
         // 标记工作完成并通知可能等待的线程池管理线程

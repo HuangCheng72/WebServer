@@ -36,6 +36,7 @@ void FreeSocketQueue(SocketTaskQueue *queue) {
 
 // 添加socket到队列尾部
 void AddToSocketQueue(SocketTaskQueue *queue, int fd) {
+    if (!queue) return;
     SocketTask *new_task = (SocketTask *)malloc(sizeof(SocketTask));
     new_task->fd = fd;
     pthread_mutex_lock(&queue->lock);
@@ -45,6 +46,8 @@ void AddToSocketQueue(SocketTaskQueue *queue, int fd) {
 
 // 从队列头部获取socket，如果队列为空则返回-1
 int GetFromSocketQueue(SocketTaskQueue *queue) {
+    //队列根本不存在，当然为空
+    if (!queue) return -1;
     pthread_mutex_lock(&queue->lock);
     if (list_empty(&queue->head)) {
         pthread_mutex_unlock(&queue->lock);
@@ -61,6 +64,8 @@ int GetFromSocketQueue(SocketTaskQueue *queue) {
 
 // 检查队列是否为空
 int IsSocketQueueEmpty(SocketTaskQueue *queue) {
+    //队列根本不存在，当然为空
+    if (!queue) return 1;
     pthread_mutex_lock(&queue->lock);
     int empty = list_empty(&queue->head);
     pthread_mutex_unlock(&queue->lock);

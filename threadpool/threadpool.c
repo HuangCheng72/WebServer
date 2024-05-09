@@ -82,7 +82,7 @@ void ExpandThreadPool(ThreadPool *pool, int maxsize ,void *(*pFunction)(void *),
     int currentTotal = pool->activecount + pool->idlecount; // 当前线程总数
     int newThreadsCount = pool->activecount;
     if((newThreadsCount + currentTotal) > maxsize) {
-        int newThreadsCount = maxsize - currentTotal; // 计算可以添加的最大线程数
+        newThreadsCount = maxsize - currentTotal; // 计算可以添加的最大线程数
     }
     for (int i = 0; i < newThreadsCount; i++) {
         Thread *newThread = CreateThread(pool, pFunction, pArgs);

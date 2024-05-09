@@ -4,10 +4,12 @@
 
 #include "threadpoolmanager.h"
 
+extern int keep_running;
+
 // 通用的线程管理函数
 void *ThreadPoolManagerThread(void *arg) {
     if(!arg) {
-        return NULL;
+        pthread_exit(NULL);
     }
 
     ThreadPoolManagerConfig *config = (ThreadPoolManagerConfig *)arg;
@@ -22,14 +24,14 @@ void *ThreadPoolManagerThread(void *arg) {
         }
     }
 
-    int count = config->releasePeriod;
+    int count = config->releasePeriod;;
 
     // 确保初始线程池空闲线程数满足最小空闲线程数要求
     while(config->pool->idlecount < config->minIdleThreads) {
         AddThreadToIdleQueue(config->pool, CreateThread(config->pool, config->workFunction, config->workFunctionArgs));
     }
 
-    while (1) {
+    while (1 && keep_running) {
 
         // 等待计时器线程的信号，阻塞时间极短，可以认为是非阻塞方式
         struct timespec now;
@@ -45,7 +47,7 @@ void *ThreadPoolManagerThread(void *arg) {
         }
         if(count == 0) {
             // 因为ShrinkThreadPool这东西用了线程池锁保证安全，所以只能离开锁的作用域使用
-            ShrinkThreadPool(config->pool, 10);
+            ShrinkThreadPool(config->pool, config->minIdleThreads);
             // 规定时间销毁一次
             count = config->releasePeriod;
         }
@@ -56,6 +58,7 @@ void *ThreadPoolManagerThread(void *arg) {
                 LIST_NODE *node = config->pool->idle_queue.next;
                 Thread *thread = list_entry(node, Thread, node);
                 list_del(node);
+                config->pool->idlecount--;
                 thread->is_working = 1;
                 list_add_tail(node, &config->pool->work_queue);
                 config->pool->activecount++;
@@ -84,7 +87,7 @@ void *ThreadPoolManagerThread(void *arg) {
 
     // 解除订阅计时线程
     unregister_timer_thread(timer_ctrl);
-    destroyThreadPool(config->pool);
+    DestroyThreadPool(config->pool);
 
-    return NULL;
+    pthread_exit(NULL);
 }

@@ -9,6 +9,9 @@ extern SocketTaskQueue* ActiveSocketQueue;
 // 空闲队列，就是没任务的
 extern SocketTaskQueue* IdleSocketQueue;
 
+// 程序是否继续运行标志
+extern int keep_running;
+
 //交换两个元素，该函数不对外暴露
 void exchange(TCPPOOL *pTCPPOOL, int i,int j){
     if(i == j){
@@ -102,8 +105,7 @@ TCPPOOL *CreateTCPPoll() {
     pTCPPOOL->epoll_fd = epoll_fd;
 
     // 连接池的线程互斥锁
-    pTCPPOOL->mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(pTCPPOOL->mutex, NULL);
+    pthread_mutex_init(&pTCPPOOL->mutex, NULL);
 
     // 返回设置好的头结点
     return pTCPPOOL;
@@ -158,7 +160,7 @@ int AddTCPToTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
     }
 
     // trylock 返回0说明之前锁没锁定，尝试加锁成功了，否则就返回非0
-    if (pthread_mutex_trylock(pTCPPOOL->mutex)) {
+    if (pthread_mutex_trylock(&pTCPPOOL->mutex)) {
         // 加锁失败，连接池出问题了
         return 0;
     }
@@ -171,7 +173,7 @@ int AddTCPToTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
         if (epoll_ctl(pTCPPOOL->epoll_fd, EPOLL_CTL_ADD, pTCPINFO->client_socket, &ev) == -1) {
             // 无法监听，添加失败
             perror("Failed to add socket to epoll");
-            pthread_mutex_unlock(pTCPPOOL->mutex);   // 解锁
+            pthread_mutex_unlock(&pTCPPOOL->mutex);   // 解锁
             return 0;
         } else {
             // 设置管理信息
@@ -191,7 +193,7 @@ int AddTCPToTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
 
             hashtable_insert(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket, pTCPINFO);  // 建立文件描述符和TCP连接信息结构体指针之间的关系
 
-            pthread_mutex_unlock(pTCPPOOL->mutex);   // 解锁
+            pthread_mutex_unlock(&pTCPPOOL->mutex);   // 解锁
             return 1;
         }
     }
@@ -207,7 +209,7 @@ int RemoveTCPFromTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
     }
 
     // trylock 返回0说明之前锁没锁定，尝试加锁成功了，否则就返回非0
-    if (pthread_mutex_trylock(pTCPPOOL->mutex)) {
+    if (pthread_mutex_trylock(&pTCPPOOL->mutex)) {
         // 加锁失败，连接池出问题了
         return -1;
     }
@@ -216,7 +218,7 @@ int RemoveTCPFromTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
     if (epoll_ctl(pTCPPOOL->epoll_fd, EPOLL_CTL_DEL, pTCPINFO->client_socket, NULL) == -1) {
         // 无法从epoll队列移除，终止在连接池中的其他操作
         perror("Failed to remove socket from epoll");
-        pthread_mutex_unlock(pTCPPOOL->mutex);   // 解锁
+        pthread_mutex_unlock(&pTCPPOOL->mutex);   // 解锁
         return -1;
     } else {
         // 首先把这个指针交换到堆末尾，然后再缩小堆的规模
@@ -236,12 +238,12 @@ int RemoveTCPFromTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
         pTCPINFO->client_socket = -1;       // 设置为一个不可能的值，防止出错
         init_list_node(&(pTCPINFO->node));   // 让这个结点成为一个自环，也就是初始化状态
 
-        pthread_mutex_unlock(pTCPPOOL->mutex);   // 解锁
+        pthread_mutex_unlock(&pTCPPOOL->mutex);   // 解锁
         return fd;
     }
 }
 
-void FreeTCPPoll(TCPPOOL *pTCPPOOL) {
+void FreeTCPPool(TCPPOOL *pTCPPOOL) {
     if (!pTCPPOOL) return;
 
     // 直接关闭所有的TCP连接，然后从连接池中删除所有连接
@@ -257,8 +259,7 @@ void FreeTCPPoll(TCPPOOL *pTCPPOOL) {
         FreeTCPINFO(pTCPINFO);
     }
     // 回收互斥锁
-    pthread_mutex_destroy(pTCPPOOL->mutex);
-    free(pTCPPOOL->mutex);
+    pthread_mutex_destroy(&pTCPPOOL->mutex);
     // 回收指针数组和哈希表
     freeHashTable(pTCPPOOL->pHashTable_fd_pTCPINFO);
     free(pTCPPOOL->pTCPINFO);
@@ -266,6 +267,13 @@ void FreeTCPPoll(TCPPOOL *pTCPPOOL) {
     free(pTCPPOOL->head);
     // 回收整个连接池
     free(pTCPPOOL);
+}
+
+void PrintTCPPoolStatus(TCPPOOL *pTCPPOOL) {
+    if(!pTCPPOOL) return;
+    pthread_mutex_lock(&pTCPPOOL->mutex);
+    printf("TCP连接池中现有连接数量为: %d\n", pTCPPOOL->count);
+    pthread_mutex_unlock(&pTCPPOOL->mutex);
 }
 
 // 连接池管理线程函数
@@ -288,7 +296,7 @@ void* tcppool_thread(void* arg) {
 
     //每个被添加进来的一定是加入epoll了，不要重复添加了
 
-    while (1) {
+    while (1 && keep_running) {
 
         // 等待计时器线程的信号，阻塞时间极短，可以认为是非阻塞方式
         struct timespec now;
@@ -385,6 +393,6 @@ void* tcppool_thread(void* arg) {
         }
     }
     //释放整个TCP管理体系
-    FreeTCPPoll(pTCPPOOL);
-    return NULL;
+    FreeTCPPool(pTCPPOOL);
+    pthread_exit(NULL);
 }

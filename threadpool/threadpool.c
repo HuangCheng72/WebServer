@@ -32,7 +32,7 @@ void *ThreadFunctionWrapper(void *arg) {
         }
         pthread_mutex_unlock(&pt->mutex);
 
-        if (pt->pFunction  && pt->is_working) {  // 检查工作函数是否存在，再次确认是否应该工作了并执行
+        if (pt->pFunction) {  // 检查工作函数是否存在
             pt->pFunction(pt->pArgs);
         }
         // 标记工作完成并通知可能等待的线程池管理线程
@@ -71,37 +71,33 @@ void AddThreadToIdleQueue(ThreadPool *pool, Thread *thread) {
 
 // 线程安全扩展线程池，不得在线程池锁作用域内使用
 void ExpandThreadPool(ThreadPool *pool, int maxsize ,void *(*pFunction)(void *), void *pArgs) {
-    pthread_mutex_lock(&pool->lock);
-    if((pool->activecount + pool->idlecount) == 0){
-        // 线程池是空的先放最基本的线程吧
+    pthread_mutex_lock(&pool->lock);    //加锁
+
+    if(pool->idlecount > 0 || (pool->activecount + pool->idlecount) >= maxsize) {
+        // 如果有空闲线程或已达到最大线程数，不进行扩展
         pthread_mutex_unlock(&pool->lock);
         return;
     }
-    if((pool->activecount + pool->idlecount) >= maxsize){
-        // 达到上限不准再扩展了
-        pthread_mutex_unlock(&pool->lock);
-        return;
-    }
-    if(pool->idlecount > 0) {
-        // 还有空闲线程就不扩了
-        pthread_mutex_unlock(&pool->lock);
-        return;
-    }
-    int newThreadsCount = pool->activecount;  // 新增线程数等于当前工作线程数（加倍）
-    if(newThreadsCount + pool->activecount > maxsize) {
-        newThreadsCount = maxsize - pool->activecount;
+
+    int currentTotal = pool->activecount + pool->idlecount; // 当前线程总数
+    int newThreadsCount = pool->activecount;
+    if((newThreadsCount + currentTotal) > maxsize) {
+        int newThreadsCount = maxsize - currentTotal; // 计算可以添加的最大线程数
     }
     for (int i = 0; i < newThreadsCount; i++) {
-        list_add_tail(&(CreateThread(pool, pFunction, pArgs)->node), &pool->idle_queue);
-        pool->idlecount++;
+        Thread *newThread = CreateThread(pool, pFunction, pArgs);
+        if (newThread) { // 确保线程创建成功
+            list_add_tail(&(newThread->node), &pool->idle_queue);
+            pool->idlecount++;
+        }
     }
-    pthread_mutex_unlock(&pool->lock);
+    pthread_mutex_unlock(&pool->lock);  //解锁
 }
 
 // 线程安全缩减线程池，不得在线程池锁作用域内使用
 void ShrinkThreadPool(ThreadPool *pool, int minsize) {
     pthread_mutex_lock(&pool->lock);
-    if(pool->idlecount <= minsize) {
+    if((pool->activecount + pool->idlecount) <= minsize) {
         // 没必要缩减
         pthread_mutex_unlock(&pool->lock);
         return;
@@ -125,7 +121,7 @@ void ShrinkThreadPool(ThreadPool *pool, int minsize) {
 }
 
 // 销毁整个线程池
-void destroyThreadPool(ThreadPool *pool) {
+void DestroyThreadPool(ThreadPool *pool) {
     pthread_mutex_lock(&pool->lock);
     // 取消所有线程
     LIST_NODE *pos, *tmp;
@@ -146,4 +142,12 @@ void destroyThreadPool(ThreadPool *pool) {
     // 销毁互斥锁和条件变量
     pthread_mutex_destroy(&pool->lock);
     free(pool);
+}
+
+void PrintThreadPoolStatus(ThreadPool *pool) {
+    if (!pool) return;
+
+    pthread_mutex_lock(&pool->lock);
+    printf("当前线程池中，活跃线程数为: %d ，空闲线程数为: %d \n", pool->activecount, pool->idlecount);
+    pthread_mutex_unlock(&pool->lock);
 }

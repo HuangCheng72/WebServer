@@ -12,10 +12,10 @@
 #include "../list/list.h"
 
 typedef struct timer_thread_control {
-    pthread_t thread_id;    // 线程ID
-    pthread_cond_t *cond;    // 条件变量
-    pthread_mutex_t *mutex;  // 互斥锁
-    LIST_NODE node;         // 链表节点
+    pthread_t thread_id;        // 线程ID
+    pthread_cond_t *cond;       // 条件变量
+    pthread_mutex_t *mutex;     // 互斥锁
+    LIST_NODE node;             // 链表节点
 } TimerThreadControl;
 
 /**
@@ -32,12 +32,15 @@ TimerThreadControl *register_timer_thread(pthread_t id);
 void unregister_timer_thread(TimerThreadControl *pTimer_Ctl);
 
 /**
+ * 销毁整个计时线程所掌握的资源
+ */
+void destroy_timer_thread();
+
+/**
  * 计时线程
  * @param arg 传输空指针NULL
  * @return
  */
 void *timer_thread(void *arg);
-
-
 
 #endif //WEBSERVER_TIMERTHREAD_H

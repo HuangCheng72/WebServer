@@ -4,6 +4,9 @@
 
 #include "timerthread.h"
 
+// 程序是否继续运行标志
+extern int keep_running;
+
 // 用链表记录订阅了计时信息的线程信息
 LIST_HEAD(timerthread_list_head);
 // 只用于计时管理线程的锁，在名字上区分
@@ -39,6 +42,19 @@ void unregister_timer_thread(TimerThreadControl *pTimer_Ctl) {
     pthread_mutex_unlock(&timer_global_lock);
 }
 
+void destroy_timer_thread() {
+    pthread_mutex_lock(&timer_global_lock);
+
+    LIST_NODE *pos, *n;
+    // 使用安全的遍历方式，因为我们会在遍历过程中删除节点
+    list_for_each_safe(pos, n, &timerthread_list_head) {
+        TimerThreadControl *ctrl = list_entry(pos, TimerThreadControl, node);
+        unregister_timer_thread(ctrl);  // 这将销毁 cond, mutex, 并释放节点
+    }
+
+    pthread_mutex_unlock(&timer_global_lock);
+}
+
 void *timer_thread(void *arg) {
     struct timespec spec;
     long long last_time, current_time;
@@ -47,7 +63,7 @@ void *timer_thread(void *arg) {
     clock_gettime(CLOCK_MONOTONIC, &spec);
     last_time = spec.tv_sec * 1000000000LL + spec.tv_nsec;
 
-    while (1) {
+    while (1 && keep_running) {
         // 不断获取当前时间
         clock_gettime(CLOCK_MONOTONIC, &spec);
         current_time = spec.tv_sec * 1000000000LL + spec.tv_nsec;
@@ -67,4 +83,7 @@ void *timer_thread(void *arg) {
             pthread_mutex_unlock(&timer_global_lock);
         }
     }
+
+    destroy_timer_thread();
+    pthread_exit(NULL);
 }

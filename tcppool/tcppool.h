@@ -29,7 +29,9 @@ typedef struct tcpinfo {
 
 typedef struct tcppoll {
     // count为正在被管理的TCP连接数，size为数组大小
-    int count, size;
+    volatile int count;
+    // count变动性太强，要加上volatile，不得从缓存读取，size变动性不强
+    int size;
 
     // 指针数组，在指针数组上建立数据结构，比在结构体数组数组上建立数据结构容易，因为指针更容易交换
     // 运用小顶堆思想改写（下标从1开始比较好计算），可以在pTCPINFO[0]处放置哨兵
@@ -46,7 +48,7 @@ typedef struct tcppoll {
     //这个连接池拥有的epoll实例
     int epoll_fd;
 
-    pthread_mutex_t *mutex;     // 线程互斥锁
+    pthread_mutex_t mutex;     // 线程互斥锁
 
 } TCPPOOL;
 
@@ -90,7 +92,13 @@ int RemoveTCPFromTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO);
  * 释放整个连接池所有资源
  * @param pTCPPOOL 指向连接池的指针
  */
-void FreeTCPPoll(TCPPOOL *pTCPPOOL);
+void FreeTCPPool(TCPPOOL *pTCPPOOL);
+
+/**
+ * 输出TCP连接池的状态
+ * @param pTCPPOOL
+ */
+void PrintTCPPoolStatus(TCPPOOL *pTCPPOOL);
 
 /**
  * 连接池管理线程函数

@@ -6,6 +6,9 @@ file(REMOVE_RECURSE
   "CMakeFiles/WebServer.dir/hashtable/hashtable.c.o"
   "CMakeFiles/WebServer.dir/tcppool/tcppool.c.o"
   "CMakeFiles/WebServer.dir/threadpool/threadpool.c.o"
+  "CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o"
+  "CMakeFiles/WebServer.dir/list/RequestQueue.c.o"
+  "CMakeFiles/WebServer.dir/acceptthread/acceptthread.c.o"
   "WebServer.pdb"
   "WebServer"
 )

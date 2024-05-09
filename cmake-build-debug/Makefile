@@ -123,6 +123,33 @@ WebServer/fast:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/build
 .PHONY : WebServer/fast
 
+acceptthread/acceptthread.o: acceptthread/acceptthread.c.o
+
+.PHONY : acceptthread/acceptthread.o
+
+# target to build an object file
+acceptthread/acceptthread.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/acceptthread/acceptthread.c.o
+.PHONY : acceptthread/acceptthread.c.o
+
+acceptthread/acceptthread.i: acceptthread/acceptthread.c.i
+
+.PHONY : acceptthread/acceptthread.i
+
+# target to preprocess a source file
+acceptthread/acceptthread.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/acceptthread/acceptthread.c.i
+.PHONY : acceptthread/acceptthread.c.i
+
+acceptthread/acceptthread.s: acceptthread/acceptthread.c.s
+
+.PHONY : acceptthread/acceptthread.s
+
+# target to generate assembly for a file
+acceptthread/acceptthread.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/acceptthread/acceptthread.c.s
+.PHONY : acceptthread/acceptthread.c.s
+
 hashtable/hashtable.o: hashtable/hashtable.c.o
 
 .PHONY : hashtable/hashtable.o
@@ -149,6 +176,33 @@ hashtable/hashtable.s: hashtable/hashtable.c.s
 hashtable/hashtable.c.s:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/hashtable/hashtable.c.s
 .PHONY : hashtable/hashtable.c.s
+
+list/RequestQueue.o: list/RequestQueue.c.o
+
+.PHONY : list/RequestQueue.o
+
+# target to build an object file
+list/RequestQueue.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/RequestQueue.c.o
+.PHONY : list/RequestQueue.c.o
+
+list/RequestQueue.i: list/RequestQueue.c.i
+
+.PHONY : list/RequestQueue.i
+
+# target to preprocess a source file
+list/RequestQueue.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/RequestQueue.c.i
+.PHONY : list/RequestQueue.c.i
+
+list/RequestQueue.s: list/RequestQueue.c.s
+
+.PHONY : list/RequestQueue.s
+
+# target to generate assembly for a file
+list/RequestQueue.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/list/RequestQueue.c.s
+.PHONY : list/RequestQueue.c.s
 
 list/list.o: list/list.c.o
 
@@ -285,6 +339,33 @@ threadpool/threadpool.c.s:
 	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpool.c.s
 .PHONY : threadpool/threadpool.c.s
 
+threadpool/threadpoolmanager.o: threadpool/threadpoolmanager.c.o
+
+.PHONY : threadpool/threadpoolmanager.o
+
+# target to build an object file
+threadpool/threadpoolmanager.c.o:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o
+.PHONY : threadpool/threadpoolmanager.c.o
+
+threadpool/threadpoolmanager.i: threadpool/threadpoolmanager.c.i
+
+.PHONY : threadpool/threadpoolmanager.i
+
+# target to preprocess a source file
+threadpool/threadpoolmanager.c.i:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.i
+.PHONY : threadpool/threadpoolmanager.c.i
+
+threadpool/threadpoolmanager.s: threadpool/threadpoolmanager.c.s
+
+.PHONY : threadpool/threadpoolmanager.s
+
+# target to generate assembly for a file
+threadpool/threadpoolmanager.c.s:
+	$(MAKE) -f CMakeFiles/WebServer.dir/build.make CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.s
+.PHONY : threadpool/threadpoolmanager.c.s
+
 timer/timerthread.o: timer/timerthread.c.o
 
 .PHONY : timer/timerthread.o
@@ -321,9 +402,15 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... WebServer"
 	@echo "... edit_cache"
+	@echo "... acceptthread/acceptthread.o"
+	@echo "... acceptthread/acceptthread.i"
+	@echo "... acceptthread/acceptthread.s"
 	@echo "... hashtable/hashtable.o"
 	@echo "... hashtable/hashtable.i"
 	@echo "... hashtable/hashtable.s"
+	@echo "... list/RequestQueue.o"
+	@echo "... list/RequestQueue.i"
+	@echo "... list/RequestQueue.s"
 	@echo "... list/list.o"
 	@echo "... list/list.i"
 	@echo "... list/list.s"
@@ -339,6 +426,9 @@ help:
 	@echo "... threadpool/threadpool.o"
 	@echo "... threadpool/threadpool.i"
 	@echo "... threadpool/threadpool.s"
+	@echo "... threadpool/threadpoolmanager.o"
+	@echo "... threadpool/threadpoolmanager.i"
+	@echo "... threadpool/threadpoolmanager.s"
 	@echo "... timer/timerthread.o"
 	@echo "... timer/timerthread.i"
 	@echo "... timer/timerthread.s"

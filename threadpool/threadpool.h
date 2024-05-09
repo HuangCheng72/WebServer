@@ -6,6 +6,7 @@
 #define WEBSERVER_THREADPOOL_H
 
 #include <pthread.h>
+#include <stdio.h>
 #include <unistd.h>
 #include "../list/list.h"
 
@@ -15,7 +16,7 @@ typedef struct {
     pthread_t thread;               // 线程标识
     pthread_cond_t cond;            // 条件变量
     pthread_mutex_t mutex;          // 与条件变量配合使用的互斥锁
-    int is_working;                 // 是否正在工作
+    volatile int is_working;        // 是否正在工作
     void *(*pFunction)(void *);     // 线程执行的函数
     void *pArgs;                    // 线程执行函数可能需要的参数，指针型方便打包，怎么拆包在函数里面可以任意，如果没有就设置为NULL
 } Thread;
@@ -83,7 +84,12 @@ void ShrinkThreadPool(ThreadPool *pool, int minsize);
  * 销毁整个线程池
  * @param pool 指向线程池的指针
  */
-void destroyThreadPool(ThreadPool *pool);
+void DestroyThreadPool(ThreadPool *pool);
 
+/**
+ * 输出线程池的状态
+ * @param pool 指向线程池的指针
+ */
+void PrintThreadPoolStatus(ThreadPool *pool);
 
 #endif //WEBSERVER_THREADPOOL_H

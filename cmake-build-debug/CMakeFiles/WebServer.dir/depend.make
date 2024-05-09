@@ -5,6 +5,10 @@ CMakeFiles/WebServer.dir/hashtable/hashtable.c.o: ../hashtable/hashtable.c
 CMakeFiles/WebServer.dir/hashtable/hashtable.c.o: ../hashtable/hashtable.h
 CMakeFiles/WebServer.dir/hashtable/hashtable.c.o: ../list/list.h
 
+CMakeFiles/WebServer.dir/list/RequestQueue.c.o: ../list/RequestQueue.c
+CMakeFiles/WebServer.dir/list/RequestQueue.c.o: ../list/RequestQueue.h
+CMakeFiles/WebServer.dir/list/RequestQueue.c.o: ../list/list.h
+
 CMakeFiles/WebServer.dir/list/list.c.o: ../list/list.c
 CMakeFiles/WebServer.dir/list/list.c.o: ../list/list.h
 
@@ -13,10 +17,13 @@ CMakeFiles/WebServer.dir/list/socketqueue.c.o: ../list/socketqueue.c
 CMakeFiles/WebServer.dir/list/socketqueue.c.o: ../list/socketqueue.h
 
 CMakeFiles/WebServer.dir/main.c.o: ../hashtable/hashtable.h
+CMakeFiles/WebServer.dir/main.c.o: ../list/RequestQueue.h
 CMakeFiles/WebServer.dir/main.c.o: ../list/list.h
 CMakeFiles/WebServer.dir/main.c.o: ../list/socketqueue.h
 CMakeFiles/WebServer.dir/main.c.o: ../main.c
 CMakeFiles/WebServer.dir/main.c.o: ../tcppool/tcppool.h
+CMakeFiles/WebServer.dir/main.c.o: ../threadpool/threadpool.h
+CMakeFiles/WebServer.dir/main.c.o: ../threadpool/threadpoolmanager.h
 CMakeFiles/WebServer.dir/main.c.o: ../timer/timerthread.h
 
 CMakeFiles/WebServer.dir/tcppool/tcppool.c.o: ../hashtable/hashtable.h
@@ -25,6 +32,16 @@ CMakeFiles/WebServer.dir/tcppool/tcppool.c.o: ../list/socketqueue.h
 CMakeFiles/WebServer.dir/tcppool/tcppool.c.o: ../tcppool/tcppool.c
 CMakeFiles/WebServer.dir/tcppool/tcppool.c.o: ../tcppool/tcppool.h
 CMakeFiles/WebServer.dir/tcppool/tcppool.c.o: ../timer/timerthread.h
+
+CMakeFiles/WebServer.dir/threadpool/threadpool.c.o: ../list/list.h
+CMakeFiles/WebServer.dir/threadpool/threadpool.c.o: ../threadpool/threadpool.c
+CMakeFiles/WebServer.dir/threadpool/threadpool.c.o: ../threadpool/threadpool.h
+
+CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o: ../list/list.h
+CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o: ../threadpool/threadpool.h
+CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o: ../threadpool/threadpoolmanager.c
+CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o: ../threadpool/threadpoolmanager.h
+CMakeFiles/WebServer.dir/threadpool/threadpoolmanager.c.o: ../timer/timerthread.h
 
 CMakeFiles/WebServer.dir/timer/timerthread.c.o: ../list/list.h
 CMakeFiles/WebServer.dir/timer/timerthread.c.o: ../timer/timerthread.c

@@ -14,6 +14,7 @@
 #include "tcppool/tcppool.h"
 #include "threadpool/threadpool.h"
 #include "threadpool/threadpoolmanager.h"
+#include "list/RequestQueue.h"
 
 // 随便一个端口都行，只要没占用、没被防火墙拦截（所以需要在防火墙里面放行）就行。
 #define PORT 8080
@@ -21,18 +22,21 @@
 #define WEB_ROOT "/home/hc/web"
 
 // 活跃队列，就是有任务的
-SocketTaskQueue* ActiveSocketQueue;
+SocketTaskQueue* ActiveSocketQueue = NULL;
 // 空闲队列，就是没任务的
-SocketTaskQueue* IdleSocketQueue;
+SocketTaskQueue* IdleSocketQueue = NULL;
 
-// HTTP请求处理函数
-void handle_http_request();
+// HTTP请求接收函数（管道化）
+void receive_http_requests_pipelining(int clientSocket, RequestQueue *pRequestQueue);
+
+// 解析与响应函数（管道化）
+void parse_and_respond_pipelining(int clientSocket, RequestQueue *pRequestQueue);
+
+// HTTP请求处理函数（管道化）
+void handle_http_request_pipelining();
 
 // 用于判断是否有任务需要处理的函数
 int function() { return !IsSocketQueueEmpty(ActiveSocketQueue); }
-
-// HTTP处理线程管理的线程
-void *handle_http_request_ThreadManageThread(void *arg);
 
 int set_non_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -105,7 +109,7 @@ int main() {
     pConfig->maxThreads = 256;
     pConfig->minIdleThreads = 10;
     pConfig->releasePeriod = 60;
-    pConfig->workFunction = handle_http_request;
+    pConfig->workFunction = handle_http_request_pipelining;
     pConfig->workFunctionArgs = NULL;
 
     pthread_create(&ThreadPoolManagerThread_id, NULL, ThreadPoolManagerThread, pConfig);
@@ -134,27 +138,85 @@ int main() {
     return 0;
 }
 
-void handle_http_request() {
-
-    // 直接从队列里面取
-    int client_socket = GetFromSocketQueue(ActiveSocketQueue);
-    if(client_socket == -1) {
-        // 获取失败退出
-        return;
-    }
-
-    char buffer[4096];
+void receive_http_requests_pipelining(int clientSocket, RequestQueue *pRequestQueue) {
+    char buffer[8192];
+    char request[8192];  // 用于存储一个完整的请求
+    int request_len = 0; // 当前请求长度
 
     while (1) {
-        // 确定是否有数据到达，有就处理
-        int bytes_read = read(client_socket, buffer, sizeof(buffer) - 1);
-        if(bytes_read > 0) {
-            buffer[bytes_read] = '\0';
-            char method[10], path[1024], protocol[10];
-            if (sscanf(buffer, "%s %s %s", method, path, protocol) != 3) {
-                continue; // 如果没有解析到完整的请求行，继续监听
-            }
+        int bytes_read = read(clientSocket, buffer, sizeof(buffer) - 1);
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';  // 确保字符串正确终止
+            int buffer_pos = 0; // 用于遍历buffer
 
+            // 处理buffer中的数据
+            while (buffer_pos < bytes_read) {
+                char *end_of_request = strstr(&buffer[buffer_pos], "\r\n\r\n"); // 查找请求结束标志
+                if (end_of_request != NULL) {
+                    int length_to_end_of_request = end_of_request - &buffer[buffer_pos] + 4; // 包括"\r\n\r\n"
+                    // 检查是否有足够空间拼接完整请求
+                    if (request_len + length_to_end_of_request < sizeof(request)) {
+                        // 拼接当前部分到请求
+                        memcpy(request + request_len, &buffer[buffer_pos], length_to_end_of_request);
+                        request_len += length_to_end_of_request;
+
+                        // 将完整请求添加到队列
+                        AddToRequestQueue(pRequestQueue, request, request_len);
+
+                        // 清空request，准备下一个请求
+                        memset(request, 0, sizeof(request));
+                        request_len = 0;
+
+                        // 移动buffer_pos到下一个可能的请求起始位置
+                        buffer_pos += length_to_end_of_request;
+                    } else {
+                        // 如果请求太长无法处理，可以返回错误或者断开连接
+                        break;
+                    }
+                } else {
+                    // 如果没找到请求结束，将剩余部分添加到request
+                    int remaining_length = bytes_read - buffer_pos;
+                    if (request_len + remaining_length < sizeof(request)) {
+                        memcpy(request + request_len, &buffer[buffer_pos], remaining_length);
+                        request_len += remaining_length;
+                    } else {
+                        // 如果请求太长无法处理，可以返回错误或者断开连接
+                        break;
+                    }
+                    break; // 等待下一次读取
+                }
+            }
+        } else if (bytes_read == 0) {
+            // 读取到EOF，客户端关闭连接
+            break;
+        } else {
+            // 读取错误处理
+            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                perror("read error");
+                break;
+            }
+            // 读取完成但是没有错误，退出循环
+            break;
+        }
+    }
+}
+
+void parse_and_respond_pipelining(int clientSocket, RequestQueue *pRequestQueue) {
+
+    if(clientSocket == -1 || !pRequestQueue) {
+        return;
+    }
+    int client_socket = clientSocket;
+
+    while (!IsRequestQueueEmpty(pRequestQueue)) {
+        RequestData *data = GetFromRequestQueue(pRequestQueue);
+        if(data == NULL) {
+            return;
+        }
+
+        // 这里处理每一个独立的HTTP请求
+        char method[10], path[1024], protocol[10];
+        if (sscanf(data->data, "%s %s %s", method, path, protocol) == 3) {
             //这个变量是用于确定还要不要继续连接下去
             int keep_alive = 1; //HTTP/1.1默认就是持久连接
 
@@ -162,7 +224,7 @@ void handle_http_request() {
                 keep_alive = 0; //HTTP/1.0默认没有持久连接
             }
 
-            char *connection_header = strstr(buffer, "Connection:");
+            char *connection_header = strstr(data->data, "Connection:");
 
             if (connection_header && strstr(connection_header, "keep-alive")) {
                 keep_alive = 1; //再次明确到底有没有持久连接
@@ -190,7 +252,7 @@ void handle_http_request() {
                     if (write(client_socket, response, strlen(response)) == -1) {
                         perror("response_head");
                         close(client_socket);
-                        pthread_exit(NULL);
+                        return;
                     }
                     //零拷贝直接发送文件
                     sendfile(client_socket, file, NULL, stat_buf.st_size);
@@ -202,7 +264,7 @@ void handle_http_request() {
                     if (write(client_socket, response, strlen(response)) == -1) {
                         perror("response_head");
                         close(client_socket);
-                        pthread_exit(NULL);
+                        return;
                     }
                 }
             } else {
@@ -211,26 +273,43 @@ void handle_http_request() {
                 if (write(client_socket, response, strlen(response)) == -1) {
                     perror("response_head");
                     close(client_socket);
-                    pthread_exit(NULL);
+                    return;
                 }
             }
 
             // 判断是否还需要保持连接，如果不是，则退出循环，也不要再放入连接池了，以用户要求为准
             if (!keep_alive) {
-                return;
+                // 这里就要关闭了TCP连接了
+                close(client_socket);
+                client_socket = -1;
+                FreeRequestData(data);  // 释放已处理的请求数据
+                break;
             }
-        } else if (bytes_read == 0) {
-            // 读取到EOF，客户端关闭连接
-            return;
-        } else {
-            // 如果没有读取到数据，并且不是因为阻塞，说明出错
-            if (errno != EAGAIN || errno != EWOULDBLOCK) {
-                perror("read error");
-            } else {
-                // 加入空闲队列
-                AddToSocketQueue(IdleSocketQueue, client_socket);
-            }
-            return;
         }
+
+        FreeRequestData(data);  // 释放已处理的请求数据
     }
+
+    if(client_socket > -1) {
+        // TCP连接没关闭送回空闲队列
+        AddToSocketQueue(IdleSocketQueue, client_socket);
+    }
+}
+
+void handle_http_request_pipelining() {
+
+    // 直接从队列里面取
+    int client_socket = GetFromSocketQueue(ActiveSocketQueue);
+    if(client_socket == -1) {
+        // 获取失败退出
+        return;
+    }
+
+    RequestQueue *pRequestQueue = CreateRequestQueue();
+
+    //接收数据
+    receive_http_requests_pipelining(client_socket, pRequestQueue);
+
+    //响应和处理数据
+    parse_and_respond_pipelining(client_socket, pRequestQueue);
 }

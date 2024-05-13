@@ -27,7 +27,7 @@ typedef struct tcpinfo {
 
 } TCPINFO;
 
-typedef struct tcppoll {
+typedef struct tcppool {
     // count为正在被管理的TCP连接数，size为数组大小
     volatile int count;
     // count变动性太强，要加上volatile，不得从缓存读取，size变动性不强
@@ -43,7 +43,7 @@ typedef struct tcppoll {
 
     // 文件描述符和指向TCPINFO的指针之间的哈希表，文件描述符为键，指针为值
     // 使用原因是监听TCP的时候只知道哪个文件描述符有动作，不知道对应的指针，所以用哈希表来方便查找，不然就要遍历了
-    HashTable *pHashTable_fd_pTCPINFO;
+    HashTableInt *pHashTable_fd_pTCPINFO;
 
     //这个连接池拥有的epoll实例
     int epoll_fd;
@@ -56,7 +56,7 @@ typedef struct tcppoll {
  * 创建一个已经初始化的连接池
  * @return 连接池指针
  */
-TCPPOOL *CreateTCPPoll();
+TCPPOOL *CreateTCPPool();
 
 /**
  * 创建一个连接池可以管理的TCP连接信息
@@ -96,13 +96,13 @@ void FreeTCPPool(TCPPOOL *pTCPPOOL);
 
 /**
  * 输出TCP连接池的状态
- * @param pTCPPOOL
+ * @param pTCPPOOL 指向文件池的指针
  */
 void PrintTCPPoolStatus(TCPPOOL *pTCPPOOL);
 
 /**
  * 连接池管理线程函数
- * @param arg 管理的连接池代码
+ * @param arg 传入管理的文件池指针
  * @return
  */
 void* tcppool_thread(void* arg);

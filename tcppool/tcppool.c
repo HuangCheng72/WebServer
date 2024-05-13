@@ -54,7 +54,7 @@ void sink(TCPPOOL *pTCPPOOL, int i){
     }
 }
 
-TCPPOOL *CreateTCPPoll() {
+TCPPOOL *CreateTCPPool() {
     int epoll_fd = epoll_create1(0);        // 创建epoll实例
     if (epoll_fd == -1) {
         // 创建失败就退出
@@ -74,7 +74,7 @@ TCPPOOL *CreateTCPPoll() {
 
     pTCPPOOL->pTCPINFO = (TCPINFO **)malloc(sizeof(TCPINFO*) * pTCPPOOL->size); //动态数组申请方式
     if (!pTCPPOOL->pTCPINFO) {
-        perror("Failed to allocate memory for pTCPINFO");
+        perror("Failed to allocate memory for TCPINFO");
         free(pTCPPOOL);
         close(epoll_fd);
         return NULL;
@@ -99,7 +99,7 @@ TCPPOOL *CreateTCPPoll() {
 
 
     // 建立哈希表，大小为701是个质数，使用起来效果好一点
-    pTCPPOOL->pHashTable_fd_pTCPINFO = createHashTable(701);
+    pTCPPOOL->pHashTable_fd_pTCPINFO = CreateHashTableIntKey(701);
 
     // 连接池拥有的epoll实例
     pTCPPOOL->epoll_fd = epoll_fd;
@@ -165,7 +165,7 @@ int AddTCPToTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
         return 0;
     }
 
-    if (!hashtable_contains(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket)) {
+    if (!HashTableIntKey_Contains(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket)) {
         // 将文件描述符添加到 epoll
         struct epoll_event ev;
         ev.events = EPOLLIN | EPOLLET;              // 监听读取事件，触发模式为边缘触发
@@ -191,7 +191,7 @@ int AddTCPToTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
             list_add(&(pTCPPOOL->head->node), &(pTCPINFO->node));     // 存入存储结构
             swim(pTCPPOOL, pTCPPOOL->count);                    // 堆底元素上浮，完成堆的性质维护
 
-            hashtable_insert(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket, pTCPINFO);  // 建立文件描述符和TCP连接信息结构体指针之间的关系
+            HashTableIntKey_Insert(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket, pTCPINFO);  // 建立文件描述符和TCP连接信息结构体指针之间的关系
 
             pthread_mutex_unlock(&pTCPPOOL->mutex);   // 解锁
             return 1;
@@ -229,7 +229,7 @@ int RemoveTCPFromTCPPool(TCPPOOL *pTCPPOOL, TCPINFO *pTCPINFO) {
         sink(pTCPPOOL, index);              // 然后调整顺序（因为是从堆底交换过来的，所以要下沉），完成堆的性质维护
 
         list_del(&(pTCPINFO->node));           // 从存储链表中删除这个TCP连接
-        hashtable_delete(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket);  // 删除文件描述符和TCP连接信息结构体指针之间的关系
+        HashTableIntKey_Delete(pTCPPOOL->pHashTable_fd_pTCPINFO, pTCPINFO->client_socket);  // 删除文件描述符和TCP连接信息结构体指针之间的关系
 
         // 把这个连接信息从连接池中取出，还是要处理的，因此要保留处理信息，管理信息可以删掉，防止出错
         pTCPINFO->timeout = -1;             // 设置为一个不可能的值，防止出错
@@ -261,7 +261,7 @@ void FreeTCPPool(TCPPOOL *pTCPPOOL) {
     // 回收互斥锁
     pthread_mutex_destroy(&pTCPPOOL->mutex);
     // 回收指针数组和哈希表
-    freeHashTable(pTCPPOOL->pHashTable_fd_pTCPINFO);
+    FreeHashTableIntKey(pTCPPOOL->pHashTable_fd_pTCPINFO);
     free(pTCPPOOL->pTCPINFO);
     // 回收头结点
     free(pTCPPOOL->head);
@@ -382,7 +382,7 @@ void* tcppool_thread(void* arg) {
                 // 获取发生事件的文件描述符（即有数据可读的 socket）
                 int fd = events[n].data.fd;
                 // 找到对应的指向 TCPINFO 的指针
-                TCPINFO *pTCPINFO = hashtable_find(pTCPPOOL->pHashTable_fd_pTCPINFO, fd);
+                TCPINFO *pTCPINFO = HashTableIntKey_Find(pTCPPOOL->pHashTable_fd_pTCPINFO, fd);
                 if (pTCPINFO != NULL) {
                     if(RemoveTCPFromTCPPool(pTCPPOOL, pTCPINFO) != -1) {
                         // 有任务，当然要放入任务就绪队列中等待处理

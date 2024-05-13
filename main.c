@@ -12,6 +12,7 @@
 #include "threadpool/threadpool.h"
 #include "threadpool/threadpoolmanager.h"
 #include "socketserver/socketserver.h"
+#include "filepool/filepool.h"
 
 
 // 这里我需要解释一下，"/home/hc/web"是我的网站文件夹目录，可以随便修改，或者改成用参数接受不同的路径也可以。
@@ -43,7 +44,7 @@ int main() {
 
     // 开启连接池管理线程
     pthread_t tcppool_thread_id;
-    TCPPOOL *pTCPPOOL = CreateTCPPoll();
+    TCPPOOL *pTCPPOOL = CreateTCPPool();
     pthread_create(&tcppool_thread_id, NULL, tcppool_thread, pTCPPOOL);
     pthread_detach(tcppool_thread_id);
 

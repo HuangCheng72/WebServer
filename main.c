@@ -25,6 +25,8 @@ volatile int keep_running = 1;
 SocketTaskQueue* ActiveSocketQueue = NULL;
 // 空闲队列，就是没任务的
 SocketTaskQueue* IdleSocketQueue = NULL;
+// 全局唯一文件池
+FILEPOOL *pFILEPOOL = NULL;
 
 // HTTP请求处理函数
 void handle_http_request();
@@ -41,6 +43,12 @@ int main() {
     pthread_t timer_thread_id;
     pthread_create(&timer_thread_id, NULL, timer_thread, NULL);
     pthread_detach(timer_thread_id);
+
+    // 开启连接池管理线程
+    pthread_t filepool_thread_id;
+    pFILEPOOL = CreateFilePool(60);
+    pthread_create(&filepool_thread_id, NULL, filePoolThread, pFILEPOOL);
+    pthread_detach(filepool_thread_id);
 
     // 开启连接池管理线程
     pthread_t tcppool_thread_id;
@@ -88,6 +96,7 @@ int main() {
 
         if(strcasecmp("status", str) == 0) {
             PrintSocketServerStatus(pServerConfig);
+            PrintFilePoolStatus(pFILEPOOL);
             PrintTCPPoolStatus(pTCPPOOL);
             PrintThreadPoolStatus(pThreadPool);
             // 后续还可以继续拓展
@@ -153,26 +162,21 @@ void handle_http_request() {
                 char full_path[1024];
                 sprintf(full_path, "%s%s", WEB_ROOT, strcmp(path, "/") == 0 ? "/index.html" : path);
 
-                // 同样是打开文件，这是Linux的系统调用，权限是只读
-                int file = open(full_path, O_RDONLY);
-                if (file) {
-                    // stat是Linux内核里面声明的一个结构体，Linux的文件的所有信息就存储在这样的一个结构体里面
-                    struct stat stat_buf;
-                    // 用系统调用，把文件的信息保存到我们刚刚创造的结构体临时变量里面
-                    fstat(file, &stat_buf);
+                FileResult *result = GetFileFromFilePool(pFILEPOOL, full_path, 0);
+                if (result && result->fd > -1) {
                     //格式输出到响应头
                     //stat_buf.st_size就是文件的大小属性，也就是我们要发送的内容长度
                     //升级到HTTP/1.1协议了
-                    sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %ld\r\nConnection: %s\r\n\r\n", stat_buf.st_size, keep_alive ? "keep-alive" : "close");   //客户要求持久连接，服务器就采取持久连接，否则就不持久连接。
+                    sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %ld\r\nConnection: %s\r\n\r\n", result->filestat.st_size, keep_alive ? "keep-alive" : "close");   //客户要求持久连接，服务器就采取持久连接，否则就不持久连接。
                     if (write(client_socket, response, strlen(response)) == -1) {
                         perror("response_head");
                         close(client_socket);
                         return;
                     }
                     //零拷贝直接发送文件
-                    sendfile(client_socket, file, NULL, stat_buf.st_size);
+                    sendfile(client_socket, result->fd, NULL, result->filestat.st_size);
                     //发送完毕，关闭文件
-                    close(file);
+                    ReturnFileToFilePool(pFILEPOOL, result, 0);
                 } else {
                     char *error_message = "404 Not Found";
                     sprintf(response, "HTTP/1.1 404 Not Found\r\nContent-Length: %zu\r\nConnection: %s\r\n\r\n%s", strlen(error_message), keep_alive ? "keep-alive" : "close", error_message);

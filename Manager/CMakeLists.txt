@@ -1,2 +1,2 @@
-add_executable(Manager main.c)
+add_executable(Manager manager_main.c)
 target_link_libraries(Manager PRIVATE Common)

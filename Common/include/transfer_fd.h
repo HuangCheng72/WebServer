@@ -32,21 +32,6 @@ int socketpair_create(SOCKETPAIR *pair);
 void socketpair_destroy(SOCKETPAIR *pair);
 
 /**
- * 绑定套接字到指定的文件路径
- * @param sock 套接字描述符
- * @param path 要绑定的文件路径
- * @return 成功返回0，失败返回-1
- */
-int socket_bind_to_path(int sock, const char *path);
-
-/**
- * 解绑套接字的文件路径
- * @param path 要解绑的文件路径
- * @return 成功返回0，失败返回-1
- */
-int socket_unlink_path(const char *path);
-
-/**
  * 通过本地 socket 发送一个文件描述符
  * @param sock 用于发送的本地 socket fd
  * @param fd 要发送的目标文件描述符
@@ -60,5 +45,31 @@ int fd_send(int sock, int fd);
  * @return 接收到的 fd，失败返回-1
  */
 int fd_recv(int sock);
+
+/**
+ * 状态结构体
+ */
+typedef struct {
+    int module;                 // 1=Listener, 2=Manager, 3=Worker，靠自己区分
+    int pid;                    // 模块PID
+
+    int args[14];               // 各模块自己自由使用的参数，看参数和参数之间的约定
+} StatusMessage;
+
+/**
+ * 发送状态结构体
+ * @param sock 发送目标socket fd
+ * @param status 状态结构体指针
+ * @return
+ */
+int send_status_message(int sock, const StatusMessage *status);
+
+/**
+ * 接收状态结构体
+ * @param sock 接收自哪个socket
+ * @param status_out 存储的状态结构体指针
+ * @return
+ */
+int recv_status_message(int sock, StatusMessage *status_out);
 
 #endif //WEBSERVER_TRANSFER_FD_H

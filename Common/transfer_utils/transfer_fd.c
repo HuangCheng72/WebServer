@@ -4,12 +4,10 @@
 
 #include "transfer_fd.h"
 #include <sys/socket.h>
-#include <sys/un.h>
 #include <string.h>
 #include <unistd.h>
 
 #define CONTROL_LEN CMSG_LEN(sizeof(int))
-#define SOCKET_PATH_MAX_LEN 108  // 最大文件路径长度
 
 // 创建本地 socket 对
 int socketpair_create(SOCKETPAIR *pair) {
@@ -32,35 +30,6 @@ void socketpair_destroy(SOCKETPAIR *pair) {
         close(pair->sock2);
         pair->sock2 = -1;
     }
-}
-
-
-int socket_bind_to_path(int sock, const char *path) {
-    if (strlen(path) >= SOCKET_PATH_MAX_LEN) {
-        // 路径过长，不能绑定
-        return -1;
-    }
-
-    // 准备 sockaddr_un 结构体，记录这个socket的地址信息，通过这个结构体，文件系统可以管理这个socket
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(struct sockaddr_un));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, SOCKET_PATH_MAX_LEN);
-
-    // 绑定套接字到路径
-    if (bind(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
-        return -1;
-    }
-
-    return 0;
-}
-
-int socket_unlink_path(const char *path) {
-    if (unlink(path) < 0) {
-        return -1;
-    }
-
-    return 0;
 }
 
 // 发送文件描述符
@@ -126,4 +95,44 @@ int fd_recv(int sock) {
     int fd;
     memcpy(&fd, CMSG_DATA(cmsg), sizeof(int));
     return fd;
+}
+
+int send_status_message(int sock, const StatusMessage *status) {
+    struct msghdr msg = {0};
+    struct iovec iov;
+
+    iov.iov_base = (void *)status;
+    iov.iov_len = sizeof(StatusMessage);
+
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    // 不带控制消息 -> 发送的是状态结构体
+    return sendmsg(sock, &msg, 0);
+}
+
+int recv_status_message(int sock, StatusMessage *status_out) {
+    struct msghdr msg = {0};
+    struct iovec iov;
+    char control_buf[CONTROL_LEN]; // 需要提供但我们会判断不使用它
+
+    iov.iov_base = status_out;
+    iov.iov_len = sizeof(StatusMessage);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    msg.msg_control = control_buf;
+    msg.msg_controllen = CONTROL_LEN;
+
+    ssize_t n = recvmsg(sock, &msg, 0);
+    if (n <= 0) return -1;
+
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    if (cmsg) {
+        // 是FD而不是StatusMessage，接收错误
+        memset(status_out, 0, sizeof(StatusMessage)); // 防止误用残留数据
+        return -2;
+    }
+
+    return 0;
 }

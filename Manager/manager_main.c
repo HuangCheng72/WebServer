@@ -334,6 +334,10 @@ heartbeat_report:
         }
     }
 
+    // 等待线程全部退出
+    pthread_join(recv_thread, NULL);
+    pthread_join(send_thread, NULL);
+
     // 销毁资源
     Destroy_socketinfo_queue(wait_queue);
     Destroy_socketinfo_queue(done_queue);

@@ -102,7 +102,7 @@ void Destroy_socketinfo_queue(socketinfo_queue *queue) {
  * @param queue 要判断的socket信息队列
  * @return 为空返回1，不为空返回0
  */
-int IsEmpty_socketinfo_queuee(socketinfo_queue *queue) {
+int IsEmpty_socketinfo_queue(socketinfo_queue *queue) {
     if(!queue) {
         return 0;   // 无法判断
     }

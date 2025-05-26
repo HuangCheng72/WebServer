@@ -73,7 +73,8 @@ socketinfo_queue *Create_tcpinfo_queue() {
 }
 
 /**
- * 销毁socket信息队列，如果不为空，则不会销毁（必须处理完毕才能销毁）
+ * 销毁socket信息队列
+ * 因为使用场景确定为最终资源清理，因此修改为关闭队列中所有的socket文件描述符
  * @param queue
  */
 void Destroy_socketinfo_queue(socketinfo_queue *queue) {
@@ -85,6 +86,12 @@ void Destroy_socketinfo_queue(socketinfo_queue *queue) {
         // 加锁失败，正在被占用
         return;
     }
+    struct list_node *pos = NULL;
+    list_for_each(pos, &queue->head) {
+        Destroy_socketinfo(list_entry(pos, socketinfo , node));
+        queue->size--;
+    }
+    init_list_node(&queue->head);
     // 锁在自己手里，解锁，销毁。
     pthread_mutex_unlock(&queue->lock);
     free(queue);
@@ -327,6 +334,15 @@ heartbeat_report:
             perror("Failed to send status to Daemon");
         }
     }
+
+    // 销毁资源
+    Destroy_socketinfo_queue(wait_queue);
+    Destroy_socketinfo_queue(done_queue);
+
+    // 清理自己持有的所有socket
+    close(send_to_Listener_Process_Socket);
+    close(recv_from_Listener_Process_Socket);
+    close(Daemon_Main_Socket);
 
     printf("[INFO] WebServer_Manager exit.\n");
 

@@ -159,6 +159,9 @@ socketinfo_queue *wait_queue = NULL;
 // 处理完毕的连接，等待发回Listener
 socketinfo_queue *done_queue = NULL;
 
+// 与守护进程通信的 socket（用于接收与管理进程交互的两个socket，以及上报心跳包）
+int Daemon_Main_Socket = -1;
+
 // 这是与监听进程交互的两个Socket
 int send_to_Listener_Process_Socket = -1;
 int recv_from_Listener_Process_Socket = -1;
@@ -218,10 +221,6 @@ void *RecvFromListenerThread(void *arg) {
 
     pthread_exit(NULL);
 }
-
-
-// 与守护进程通信的 socket（用于接收与监听进程交互的两个socket，以及上报心跳包）
-int Daemon_Main_Socket = -1;
 
 int main(int argc, char *argv[]) {
     // 参数校验

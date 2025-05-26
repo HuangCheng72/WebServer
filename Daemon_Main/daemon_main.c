@@ -244,6 +244,10 @@ Listener_do_restart:
                     clock_gettime(CLOCK_MONOTONIC, &last_restart_time);  // 更新重启时间
                     printf("[INFO] Listener process restarted with PID: %d\n", pid);
                 }
+            } else {
+                printf("[INFO] Listener has restarted too frequently. Please try again in a few seconds.\n");
+                // 更改重启标志
+                listener_status.module = 1;
             }
         }
 
@@ -491,6 +495,10 @@ Manager_do_restart:
                     clock_gettime(CLOCK_MONOTONIC, &last_restart_time);  // 更新重启时间
                     printf("[INFO] Manager process restarted with PID: %d\n", pid);
                 }
+            } else {
+                printf("[INFO] Manager has restarted too frequently. Please try again in a few seconds.\n");
+                // 更改重启标志
+                manager_status.module = 2;
             }
         }
 

@@ -74,6 +74,16 @@ void *ListenerMonitorThread(void *arg) {
         // pid == 0时，此时是在子进程中了
         // fork+exec 方式启动进程，可以保留文件描述符资源，因此可以直接把socketpair中属于功能进程的那一端作为启动参数传过去
 
+        // 关闭所有不属于这个功能进程的文件描述符资源
+        // 除了listener_sock保留，其他的全部关闭，这样能彻底隔离
+        // 防止其他进程存留副本导致该关闭的文件描述符残留在内核中
+        close(daemon_sock);
+        socketpair_destroy(&daemon_manager);
+        socketpair_destroy(&listener_send_manager_recv);
+        socketpair_destroy(&listener_recv_manager_send);
+
+        // 其他资源比如全局变量等，在exec之后会被替换，无需清理
+
         // 子进程作用：启动 Listener 服务
 
         // 使用listener_sock作为参数来启动子进程
@@ -214,6 +224,11 @@ Listener_do_restart:
                 }
 
                 if (pid == 0) {
+                    // 关闭所有不属于这个功能进程的文件描述符资源
+                    close(daemon_sock);
+                    socketpair_destroy(&daemon_manager);
+                    socketpair_destroy(&listener_send_manager_recv);
+                    socketpair_destroy(&listener_recv_manager_send);
 
                     // 在子进程中启动监听进程
                     char fd_str[32];
@@ -308,6 +323,16 @@ void *ManagerMonitorThread(void *arg) {
     if (pid == 0) {
         // pid == 0时，此时是在子进程中了
         // fork+exec 方式启动进程，可以保留文件描述符资源，因此可以直接把socketpair中属于功能进程的那一端作为启动参数传过去
+
+        // 关闭所有不属于这个功能进程的文件描述符资源
+        // 除了manager_sock保留，其他的全部关闭，这样能彻底隔离
+        // 防止其他进程存留副本导致该关闭的文件描述符残留在内核中
+        close(daemon_sock);
+        socketpair_destroy(&daemon_listener);
+        socketpair_destroy(&listener_send_manager_recv);
+        socketpair_destroy(&listener_recv_manager_send);
+
+        // 其他资源比如全局变量等，在exec之后会被替换，无需清理
 
         // 子进程作用：启动 Manager 服务
 
@@ -420,7 +445,7 @@ check_timeout_and_restart:
                         usleep(100 * 1000);
                     }
 
-                    // Listener超时无法自己退出，强制杀掉
+                    // Manager超时无法自己退出，强制杀掉
                     printf("[WARN] Manager did not exit, sending SIGKILL...\n");
                     kill(manager_status.pid, SIGKILL);
                     waitpid(manager_status.pid, NULL, 0);
@@ -446,6 +471,12 @@ Manager_do_restart:
                 }
 
                 if (pid == 0) {
+                    // 关闭所有不属于这个功能进程的文件描述符资源
+                    close(daemon_sock);
+                    socketpair_destroy(&daemon_listener);
+                    socketpair_destroy(&listener_send_manager_recv);
+                    socketpair_destroy(&listener_recv_manager_send);
+
                     // 在子进程中启动管理进程
                     char fd_str[32];
                     snprintf(fd_str, sizeof(fd_str), "%d", manager_sock);  // 将文件描述符转为字符串

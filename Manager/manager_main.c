@@ -61,7 +61,7 @@ typedef struct {
  * 创建socket信息队列
  * @return socket信息队列结构体指针
  */
-socketinfo_queue *Create_tcpinfo_queue() {
+socketinfo_queue *Create_socketinfo_queue() {
     socketinfo_queue *temp = (socketinfo_queue*)malloc(sizeof(socketinfo_queue));
     if(!temp) {
         return NULL;
@@ -247,8 +247,8 @@ int main(int argc, char *argv[]) {
     second_flag = 0;
 
     // 创建工作队列
-    wait_queue = Create_tcpinfo_queue();
-    done_queue = Create_tcpinfo_queue();
+    wait_queue = Create_socketinfo_queue();
+    done_queue = Create_socketinfo_queue();
 
     // 启动两个线程
     pthread_t recv_thread, send_thread;

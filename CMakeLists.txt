@@ -7,4 +7,4 @@ add_subdirectory(Common)
 add_subdirectory(Daemon_Main)
 add_subdirectory(Listener)
 add_subdirectory(Manager)
-
+add_subdirectory(Worker)

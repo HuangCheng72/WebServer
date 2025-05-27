@@ -129,11 +129,9 @@ void Destroy_socketinfo_queue(socketinfo_queue *queue) {
     if(!queue || list_empty(&queue->head)) {
         return;
     }
-    // 尝试加锁，如果锁不在自己手里，不得销毁
-    if (pthread_mutex_trylock(&queue->lock)) {
-        // 加锁失败，正在被占用
-        return;
-    }
+    // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
+    pthread_mutex_lock(&queue->lock);
+
     struct list_node *pos = NULL;
     list_for_each(pos, &queue->head) {
         Destroy_socketinfo(list_entry(pos, socketinfo , node));
@@ -167,11 +165,9 @@ int Add_socketinfo_to_queue(socketinfo_queue *queue, socketinfo *pInfo) {
     if(!queue || !pInfo) {
         return 0;
     }
-    // 尝试加锁
-    if (pthread_mutex_trylock(&queue->lock)) {
-        // 加锁失败，正在被占用，操作失败
-        return 0;
-    }
+    // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
+    pthread_mutex_lock(&queue->lock);
+
     // 加锁成功可以进行
     // list_del(&pInfo->node);  // 如果已经删除了，那么再次删除就会出现NULL->prev和NULL->next的问题，所以，这里不该删除，应该在remove里面删除
     list_add_tail(&pInfo->node, &queue->head);
@@ -190,11 +186,9 @@ socketinfo *Remove_socketinfo_from_queue(socketinfo_queue *queue) {
     if(list_empty(&queue->head)) {
         return NULL;
     }
-    // 尝试加锁
-    if (pthread_mutex_trylock(&queue->lock)) {
-        // 加锁失败，正在被占用，操作失败
-        return NULL;
-    }
+    // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
+    pthread_mutex_lock(&queue->lock);
+
     socketinfo *temp = list_entry(queue->head.next, socketinfo, node);
     list_del(&temp->node);     // 删除结点，防止影响到其前后的结点
     queue->size--;

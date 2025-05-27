@@ -132,8 +132,11 @@ void Destroy_socketinfo_queue(socketinfo_queue *queue) {
     // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
     pthread_mutex_lock(&queue->lock);
 
+    // 涉及增删链表结点的操作，必须使用list_for_each_safe
     struct list_node *pos = NULL;
-    list_for_each(pos, &queue->head) {
+    struct list_node *n = NULL;
+    list_for_each_safe(pos, n, &queue->head) {
+        list_del(pos);
         Destroy_socketinfo(list_entry(pos, socketinfo , node));
         queue->size--;
     }
@@ -639,8 +642,11 @@ void Destroy_WorkerPool(WorkerPool *pool) {
     }
     // 有多少全部回收干净
 
+    // 涉及增删链表结点的操作，必须使用 list_for_each_safe
     struct list_node *pos = NULL;
-    list_for_each(pos, &pool->head) {
+    struct list_node *n = NULL;
+    list_for_each_safe(pos, n,&pool->head) {
+        list_del(pos);
         Destroy_WorkerInfo(list_entry(pos, WorkerInfo, node));
     }
 
@@ -721,6 +727,7 @@ void *WorkerPool_Manager_Thread(void *arg) {
     // 减少一个工作进程的条件是：首先要大于min_count，而且三十秒的时间里，这个工作进程没事干，workload一直都是0，就可以关掉这个工作进程，一次只能关一个
 
     struct list_node *pos = NULL;
+    struct list_node *n = NULL;
 
     while (keep_running) {
 
@@ -728,7 +735,9 @@ void *WorkerPool_Manager_Thread(void *arg) {
         current_workload = wait_queue->size;
 
         // 删除所有已经死亡的工作进程信息
-        list_for_each(pos, &pool->head) {
+
+        // 涉及增删链表结点的操作，必须使用 list_for_each_safe
+        list_for_each_safe(pos, n, &pool->head) {
             WorkerInfo *worker_info = list_entry(pos, WorkerInfo, node);
             if(worker_info->flags == -1) {
                 // flags的值，0是正常运行状态，1是需要被杀死，-1是已经被杀死
@@ -762,6 +771,9 @@ void *WorkerPool_Manager_Thread(void *arg) {
         }
 
         // 判断是否需要减少工作进程
+
+        // 涉及增删链表结点的操作，必须使用 list_for_each_safe
+        // 但是这里只是遍历，并没有增删链表结点
         list_for_each(pos, &pool->head) {
             WorkerInfo *worker_info = list_entry(pos, WorkerInfo, node);
 

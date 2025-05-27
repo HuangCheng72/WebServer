@@ -102,14 +102,15 @@ void Destroy_tcpinfo_queue(tcpinfo_queue *queue) {
     if(!queue || list_empty(&queue->head)) {
         return;
     }
-    // 尝试加锁，如果锁不在自己手里，不得销毁
-    if (pthread_mutex_trylock(&queue->lock)) {
-        // 加锁失败，正在被占用
-        return;
-    }
+    // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
+    pthread_mutex_lock(&queue->lock);
+
+    // 涉及增删链表结点的操作，必须使用 list_for_each_safe
     struct list_node *pos = NULL;
-    list_for_each(pos, &queue->head) {
-        Destroy_tcpinfo(list_entry(pos, tcpinfo, node));
+    struct list_node *n = NULL;
+    list_for_each_safe(pos, n,&queue->head) {
+        list_del(pos);
+        Destroy_tcpinfo(list_entry(pos, tcpinfo , node));
         queue->size--;
     }
     init_list_node(&queue->head);
@@ -140,13 +141,11 @@ int Add_tcpinfo_to_queue(tcpinfo_queue *queue, tcpinfo *pInfo) {
     if(!queue || !pInfo) {
         return 0;
     }
-    // 尝试加锁
-    if (pthread_mutex_trylock(&queue->lock)) {
-        // 加锁失败，正在被占用，操作失败
-        return 0;
-    }
+    // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
+    pthread_mutex_lock(&queue->lock);
+
     // 加锁成功可以进行
-    list_del(&pInfo->node);
+    // list_del(&pInfo->node);  // 如果已经删除了，那么再次删除就会出现NULL->prev和NULL->next的问题，所以，这里不该删除，应该在remove里面删除
     list_add_tail(&pInfo->node, &queue->head);
     queue->size++;
     pthread_mutex_unlock(&queue->lock);
@@ -160,14 +159,12 @@ int Add_tcpinfo_to_queue(tcpinfo_queue *queue, tcpinfo *pInfo) {
  */
 tcpinfo *Remove_tcpinfo_from_queue(tcpinfo_queue *queue) {
     // 获取第一个元素
-    if(list_empty(&queue->head)) {
+    if(!queue || list_empty(&queue->head)) {
         return NULL;
     }
-    // 尝试加锁
-    if (pthread_mutex_trylock(&queue->lock)) {
-        // 加锁失败，正在被占用，操作失败
-        return NULL;
-    }
+    // 既然设计是要求资源操作一定要成功，那就别尝试加锁了，直接阻塞到加锁成功为止
+    pthread_mutex_lock(&queue->lock);
+
     tcpinfo *temp = list_entry(queue->head.next, tcpinfo, node);
     list_del(&temp->node);     // 删除结点，防止影响到其前后的结点
     queue->size--;
@@ -302,8 +299,11 @@ void DestroyTCPPool(tcppool* pPOOL) {
     close(pPOOL->epoll_fd);
     free(pPOOL->array_tcpinfo);
     free(pPOOL->hash_socket_tcpinfo);
+    // 涉及增删链表结点的操作，必须使用 list_for_each_safe
     struct list_node *pos = NULL;
-    list_for_each(pos, &pPOOL->head->node) {
+    struct list_node *n = NULL;
+    list_for_each_safe(pos, n, &pPOOL->head->node) {
+        list_del(pos);
         Destroy_tcpinfo(list_entry(pos, tcpinfo, node));
     }
     Destroy_tcpinfo(pPOOL->head);
@@ -358,7 +358,7 @@ void TCPPool_Expand(tcppool *pPOOL) {
  * @param pInfo TCP连接信息指针
  * @return 失败返回0，成功返回1
  */
-int Add_tcpinfo_from_accept_queue_to_TCPPool(tcppool *pPOOL, tcpinfo* pInfo) {
+int Add_tcpinfo_from_to_TCPPool(tcppool *pPOOL, tcpinfo* pInfo) {
     if (pPOOL == NULL || pInfo == NULL) {
         // 连接池不存在添加失败，pInfo为空添加失败
         return 0;
@@ -508,35 +508,37 @@ void *ListenPortThread(void *arg) {
     }
 
     fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(server_socket, &readfds);
 
     struct timeval tv = {0, 200 * 1000};  // 200ms timeout
 
     while (keep_running) {
-
-        // 用select查看有没有连接请求，如果没有就continue，给200ms的超时时间检查，这样就不用一直accept阻塞
+        // select会改变fd_set的具体内容，所以每次select之前都要重新初始化fd_set
+        FD_ZERO(&readfds);
+        FD_SET(server_socket, &readfds);
+        tv.tv_sec = 0;
+        tv.tv_usec = 200 * 1000;  // 每次都要重设 timeval 结构
 
         int ret = select(server_socket + 1, &readfds, NULL, NULL, &tv);
         if (ret < 0) {
             perror("select failed on server_socket");
             continue;
         } else if (ret == 0) {
-            continue;  // timeout，回到循环，检查 keep_running
+            continue;  // timeout
         }
 
         client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_len);
-
         if (client_socket < 0) {
             perror("Client accept failed");
             continue;
         }
-        //将client_socket设为非阻塞模式
+
         set_non_blocking(client_socket);
         Add_tcpinfo_to_queue(accept_queue, Create_tcpinfo(client_socket, 0));
     }
 
-    close(server_socket);
+    shutdown(server_socket, SHUT_RDWR);  // 关闭读写
+    close(server_socket);  // 关闭套接字
+
     free(config);       // 释放配置文件内存
 
     pthread_exit(NULL);
@@ -599,7 +601,7 @@ void* tcppool_manage_thread(void* arg) {
                     Add_tcpinfo_to_queue(release_queue, temp);
                 } else if (ret == 0) {
                     // 没有数据，入池管理，默认超时时间60秒
-                    Add_tcpinfo_from_accept_queue_to_TCPPool(pPOOL, temp);
+                    Add_tcpinfo_from_to_TCPPool(pPOOL, temp);
                 } else {
                     // 这个出错了，只能销毁
                     Destroy_tcpinfo(temp);

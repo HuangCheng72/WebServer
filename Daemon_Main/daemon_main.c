@@ -549,24 +549,24 @@ void print_status_table(const StatusMessage *status, int arg_count, ...) {
         return;
     }
 
-    printf("+-------------------+------------------+\n");
-    printf("| %-17s | %-16s |\n", "Field", "Value");
-    printf("+-------------------+------------------+\n");
+    printf("+----------------------------+---------------------------+\n");
+    printf("| %-26s | %-25s |\n", "Field", "Value");
+    printf("+----------------------------+---------------------------+\n");
 
     // 打印固定字段
-    printf("| %-17s | %-16d |\n", "Module", status->module);
-    printf("| %-17s | %-16d |\n", "PID", status->pid);
+    printf("| %-26s | %-25d |\n", "Module", status->module);
+    printf("| %-26s | %-25d |\n", "PID", status->pid);
 
     // 打印可变字段
     va_list args;
     va_start(args, arg_count);
     for (int i = 0; i < arg_count; ++i) {
         const char *label = va_arg(args, const char *);
-        printf("| %-17s | %-16d |\n", label, status->args[i]);
+        printf("| %-26s | %-25d |\n", label, status->args[i]);
     }
     va_end(args);
 
-    printf("+-------------------+------------------+\n");
+    printf("+----------------------------+---------------------------+\n");
 }
 
 int main() {
@@ -608,15 +608,20 @@ int main() {
         if (strcmp(command, "status") == 0) {
             printf("Listener Status:\n");
             print_status_table(&listener_status, 5,
-                               "Pool Size",
-                               "Pool Count",
-                               "Top Timeout",
+                               "TCP_Pool Size",
+                               "TCP_Pool Count",
+                               "TCP_Pool Top Timeout",
                                "Accept Queue",
                                "Release Queue"
             );
 
             printf("Manager Status:\n");
-            print_status_table(&manager_status, 0); // 若 manager 没有额外字段也可以打印模块与PID
+            print_status_table(&manager_status, 4,
+                               "Worker_Pool Size",
+                               "Worker Max_workload",
+                               "Worker_Pool Count",
+                               "Waiting Workload"
+            );
 
         } else if (strcmp(command, "restart") == 0) {
             printf("Forcing restart...\n");

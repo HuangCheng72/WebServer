@@ -185,6 +185,11 @@ void *SendToListenerThread(void *arg) {
         }
     }
 
+    // 解释说明：
+    // socket发到管理进程后，在监听进程已经被close，等管理进程分配给工作进程处理完毕之后再发回监听进程
+    // 监听进程才持有另一份，而发回监听进程之后，在管理进程这里也是被close
+    // 因此，在管理进程退出时关闭，socket也是可以被彻底关闭的（此时管理进程持有的是最后一份）
+
     pthread_exit(NULL);
 }
 
@@ -218,6 +223,11 @@ void *RecvFromListenerThread(void *arg) {
             sched_yield();  // 没有事件，让出CPU
         }
     }
+
+    // 解释说明：
+    // socket发到管理进程后，在监听进程已经被close，等管理进程分配给工作进程处理完毕之后再发回监听进程
+    // 监听进程才持有另一份，而发回监听进程之后，在管理进程这里也是被close
+    // 因此，在管理进程退出时关闭，socket也是可以被彻底关闭的（此时管理进程持有的是最后一份）
 
     pthread_exit(NULL);
 }

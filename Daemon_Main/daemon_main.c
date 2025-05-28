@@ -48,7 +48,8 @@ SOCKETPAIR worker_info;
 SOCKETPAIR listener_send_manager_recv;
 
 // 工作进程和监听进程之间的socket对（根据设计总原则，单向流动，worker单向流动到listener）
-SOCKETPAIR worker_send_listener_recv;
+SOCKETPAIR worker_send_listener_recv_keep_alive;    // 这里发来的是keep-alive的
+SOCKETPAIR worker_send_listener_recv_close;         // 这里发来的是立即关闭不入池的
 
 // 监听进程的status
 StatusMessage listener_status;
@@ -108,7 +109,8 @@ void *CreateWorkerThread(void *arg) {
                         socketpair_destroy(&listener_send_manager_recv);
 
                         // 每个worker都要拿到worker_send_listener_recv的sock1，所以关闭sock2就行了
-                        close(worker_send_listener_recv.sock2);
+                        close(worker_send_listener_recv_keep_alive.sock2);
+                        close(worker_send_listener_recv_close.sock2);
 
                         // 其他资源比如全局变量等，在exec之后会被替换，无需清理
 
@@ -119,10 +121,12 @@ void *CreateWorkerThread(void *arg) {
                         char fd_str1[32];
                         snprintf(fd_str1, sizeof(fd_str1), "%d", heart_beat_socket);  // 将文件描述符转为字符串
                         char fd_str2[32];
-                        snprintf(fd_str2, sizeof(fd_str2), "%d", worker_send_listener_recv.sock1);  // 将文件描述符转为字符串
+                        snprintf(fd_str2, sizeof(fd_str2), "%d", worker_send_listener_recv_keep_alive.sock1);  // 将文件描述符转为字符串
+                        char fd_str3[32];
+                        snprintf(fd_str3, sizeof(fd_str3), "%d", worker_send_listener_recv_close.sock1);  // 将文件描述符转为字符串
 
                         // 用execl来启动功能进程
-                        execl("./Worker", "WebServer_Worker", fd_str1, fd_str2, NULL);
+                        execl("./Worker", "WebServer_Worker", fd_str1, fd_str2, fd_str3, NULL);
                         // 如果 execl 返回，表示执行失败
                         perror("[ERROR] Failed to exec Worker");
 
@@ -169,7 +173,8 @@ void *ListenerMonitorThread(void *arg) {
     // 监听进程和管理进程之间的socket对，listener根据规则持有sock1，manager根据规则持有sock2
     fd_send(daemon_sock, listener_send_manager_recv.sock1);
     // 工作进程和监听进程之间的socket对，worker根据规则持有sock1，listener根据规则持有sock2
-    fd_send(daemon_sock, worker_send_listener_recv.sock2);
+    fd_send(daemon_sock, worker_send_listener_recv_keep_alive.sock2);
+    fd_send(daemon_sock, worker_send_listener_recv_close.sock2);
 
     pid = fork();
     if (pid < 0) {
@@ -188,7 +193,8 @@ void *ListenerMonitorThread(void *arg) {
         socketpair_destroy(&daemon_manager);
         socketpair_destroy(&worker_info);
         socketpair_destroy(&listener_send_manager_recv);
-        socketpair_destroy(&worker_send_listener_recv);
+        socketpair_destroy(&worker_send_listener_recv_keep_alive);
+        socketpair_destroy(&worker_send_listener_recv_close);
 
         // 其他资源比如全局变量等，在exec之后会被替换，无需清理
 
@@ -324,7 +330,8 @@ Listener_do_restart:
                 // 监听进程和管理进程之间的socket对，listener根据规则持有sock1，manager根据规则持有sock2
                 fd_send(daemon_sock, listener_send_manager_recv.sock1);
                 // 工作进程和监听进程之间的socket对，worker根据规则持有sock1，listener根据规则持有sock2
-                fd_send(daemon_sock, worker_send_listener_recv.sock2);
+                fd_send(daemon_sock, worker_send_listener_recv_keep_alive.sock2);
+                fd_send(daemon_sock, worker_send_listener_recv_close.sock2);
 
                 // 重启监听进程
                 pid = fork();
@@ -339,7 +346,8 @@ Listener_do_restart:
                     socketpair_destroy(&daemon_manager);
                     socketpair_destroy(&worker_info);
                     socketpair_destroy(&listener_send_manager_recv);
-                    socketpair_destroy(&worker_send_listener_recv);
+                    socketpair_destroy(&worker_send_listener_recv_keep_alive);
+                    socketpair_destroy(&worker_send_listener_recv_close);
 
                     // 在子进程中启动监听进程
                     char fd_str[32];
@@ -449,7 +457,8 @@ void *ManagerMonitorThread(void *arg) {
         socketpair_destroy(&daemon_listener);
         socketpair_destroy(&worker_info);
         socketpair_destroy(&listener_send_manager_recv);
-        socketpair_destroy(&worker_send_listener_recv);
+        socketpair_destroy(&worker_send_listener_recv_keep_alive);
+        socketpair_destroy(&worker_send_listener_recv_close);
 
         // 其他资源比如全局变量等，在exec之后会被替换，无需清理
 
@@ -598,7 +607,8 @@ Manager_do_restart:
                     socketpair_destroy(&daemon_listener);
                     socketpair_destroy(&worker_info);
                     socketpair_destroy(&listener_send_manager_recv);
-                    socketpair_destroy(&worker_send_listener_recv);
+                    socketpair_destroy(&worker_send_listener_recv_keep_alive);
+                    socketpair_destroy(&worker_send_listener_recv_close);
 
                     // 在子进程中启动管理进程
                     char fd_str[32];
@@ -696,7 +706,8 @@ int main() {
     socketpair_create(&worker_info);
 
     socketpair_create(&listener_send_manager_recv);
-    socketpair_create(&worker_send_listener_recv);
+    socketpair_create(&worker_send_listener_recv_keep_alive);
+    socketpair_create(&worker_send_listener_recv_close);
 
     // 初始化监听进程状态
     memset(&listener_status, -1, sizeof(StatusMessage));
@@ -786,7 +797,8 @@ int main() {
     socketpair_destroy(&worker_info);
 
     socketpair_destroy(&listener_send_manager_recv);
-    socketpair_destroy(&worker_send_listener_recv);
+    socketpair_destroy(&worker_send_listener_recv_keep_alive);
+    socketpair_destroy(&worker_send_listener_recv_close);
 
     // 各个功能进程确实退出之后再打印这句
     printf("[INFO] WebServer_Daemon_Main exit.\n");

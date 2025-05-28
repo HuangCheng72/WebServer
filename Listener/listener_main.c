@@ -454,6 +454,9 @@ tcpinfo *Remove_tcpinfo_from_TCPPool(tcppool *pPOOL, int socket_fd) {
 // 程序是否继续运行标志
 int keep_running;
 
+tcpinfo **all_tcpinfo_hashtable = NULL;     // all_tcpinfo_hashtable[client_socket] = 对应的tcpinfo指针
+int all_tcpinfo_hashtable_size = 4096;
+
 typedef struct {
     int port;                       // 监听端口
     int max_backlog;                // 允许系统为该监听套接字挂起的未完成连接的最大数量，即listen函数的第二个参数
@@ -537,8 +540,34 @@ void *ListenPortThread(void *arg) {
         }
 
         set_non_blocking(client_socket);
-        Add_tcpinfo_to_queue(accept_queue, Create_tcpinfo(client_socket, 0));
+
+        if (client_socket >= all_tcpinfo_hashtable_size) {
+            tcpinfo ** new_all_tcpinfo_hashtable = (tcpinfo**)malloc(sizeof(tcpinfo*) * all_tcpinfo_hashtable_size * 2);
+            if(!new_all_tcpinfo_hashtable) {
+                perror("cannot expand all_tcpinfo_hashtable");
+                exit(1);
+            }
+            memset(new_all_tcpinfo_hashtable, 0, sizeof(tcpinfo*) * all_tcpinfo_hashtable_size * 2);
+            for(int i = 0; i < all_tcpinfo_hashtable_size; i++) {
+                new_all_tcpinfo_hashtable[i] = all_tcpinfo_hashtable[i];
+            }
+            all_tcpinfo_hashtable = new_all_tcpinfo_hashtable;
+            all_tcpinfo_hashtable_size *= 2;
+        }
+
+        all_tcpinfo_hashtable[client_socket] = Create_tcpinfo(client_socket, 0);
+
+        Add_tcpinfo_to_queue(accept_queue, all_tcpinfo_hashtable[client_socket]);
     }
+
+    // 关闭所有连接
+    for(int i = 0; i < all_tcpinfo_hashtable_size; i++) {
+        if (all_tcpinfo_hashtable[i]) {
+            Destroy_tcpinfo(all_tcpinfo_hashtable[i]);
+        }
+    }
+    memset(all_tcpinfo_hashtable, 0, sizeof(tcpinfo*) * all_tcpinfo_hashtable_size);
+
 
     shutdown(server_socket, SHUT_RDWR);  // 关闭读写
     close(server_socket);  // 关闭套接字
@@ -581,6 +610,8 @@ void* tcppool_manage_thread(void* arg) {
         while(pPOOL->count > 0 && pPOOL->array_tcpinfo[1]->timeout == 0) {
             // 从连接池中删除并销毁其连接
             tcpinfo *top_tcpinfo = pPOOL->array_tcpinfo[1];
+            // 超时控制中关闭，销毁，要删除其在哈希表中的映射
+            all_tcpinfo_hashtable[top_tcpinfo->client_socket] = NULL;
             Destroy_tcpinfo(Remove_tcpinfo_from_TCPPool(pPOOL, top_tcpinfo->client_socket));
         }
 
@@ -650,7 +681,8 @@ void* tcppool_manage_thread(void* arg) {
 int send_to_Manager_Process_Socket = -1;
 
 // 从工作进程接收处理完毕的Socket
-int recv_from_Worker_Process_Socket = -1;
+int recv_from_Worker_Process_Socket_keep_alive = -1;
+int recv_from_Worker_Process_Socket_close = -1;
 
 // 将release队列中的tcp连接信息发到管理进程
 void *SendToManagerThread(void *arg) {
@@ -660,7 +692,7 @@ void *SendToManagerThread(void *arg) {
             if (fd_send(send_to_Manager_Process_Socket, pInfo->client_socket) < 0) {
                 perror("[ERROR] Failed to send fd to Manager");
             }
-            Destroy_tcpinfo(pInfo);
+            // 不能销毁，先留在监听进程中打开
         } else {
             sched_yield();  // 没数据就让出CPU
         }
@@ -669,35 +701,118 @@ void *SendToManagerThread(void *arg) {
     pthread_exit(NULL);
 }
 
+
+#include <dirent.h>
+
+#define MAX_PATH_LENGTH 1024
+
+// Function to check if the socket is being used by any process
+int check_socket_usage(int target_fd) {
+    char proc_fd_path[MAX_PATH_LENGTH];
+    char link_target[MAX_PATH_LENGTH];
+    struct dirent *entry;
+    DIR *dir;
+    int count = 0;
+
+    // Traverse the /proc directory to check file descriptors of all processes
+    dir = opendir("/proc");
+    if (!dir) {
+        perror("opendir");
+        return -1;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        // Check if the entry is a valid PID directory
+        if (entry->d_type == DT_DIR && atoi(entry->d_name) > 0) {
+            // Construct the path to the /proc/[pid]/fd directory
+            snprintf(proc_fd_path, sizeof(proc_fd_path), "/proc/%s/fd", entry->d_name);
+
+            // Open the fd directory for the current process
+            DIR *fd_dir = opendir(proc_fd_path);
+            if (fd_dir) {
+                struct dirent *fd_entry;
+                while ((fd_entry = readdir(fd_dir)) != NULL) {
+                    if (fd_entry->d_type == DT_LNK) {
+                        // Construct the full path for the symbolic link
+                        char fd_link[MAX_PATH_LENGTH];
+                        snprintf(fd_link, sizeof(fd_link), "%s/%s", proc_fd_path, fd_entry->d_name);
+
+                        // Get the target of the symbolic link
+                        ssize_t len = readlink(fd_link, link_target, sizeof(link_target) - 1);
+                        if (len != -1) {
+                            link_target[len] = '\0';
+
+                            // Check if the link target corresponds to a socket
+                            if (strstr(link_target, "socket:[") != NULL) {
+                                int fd;
+                                sscanf(link_target, "socket:[%d]", &fd);
+                                if (fd == target_fd) {
+                                    printf("Found socket %d in process %s with fd %s\n", target_fd, entry->d_name, fd_entry->d_name);
+                                    count++;
+                                    break;  // Found the socket in this process, no need to continue checking its other fds
+                                }
+                            }
+                        }
+                    }
+                }
+                closedir(fd_dir);
+            }
+        }
+    }
+
+    closedir(dir);
+    return count;
+}
+
 // 从工作进程接收socket，放入accept队列中，等待进入连接池
 void *RecvFromWorkerThread(void *arg) {
     struct timeval tv;
     fd_set read_fds;
 
     while (keep_running) {
+        // 检查keep-alive
         FD_ZERO(&read_fds);
-        FD_SET(recv_from_Worker_Process_Socket, &read_fds);
+        FD_SET(recv_from_Worker_Process_Socket_keep_alive, &read_fds);
 
         tv.tv_sec = 0;
         tv.tv_usec = 0; // 非阻塞检查
 
-        int ret = select(recv_from_Worker_Process_Socket + 1, &read_fds, NULL, NULL, &tv);
-        if (ret > 0 && FD_ISSET(recv_from_Worker_Process_Socket, &read_fds)) {
-            int client_fd = fd_recv(recv_from_Worker_Process_Socket);
+        int ret = select(recv_from_Worker_Process_Socket_keep_alive + 1, &read_fds, NULL, NULL, &tv);
+        if (ret > 0 && FD_ISSET(recv_from_Worker_Process_Socket_keep_alive, &read_fds)) {
+            int client_fd = fd_recv(recv_from_Worker_Process_Socket_keep_alive);
             if (client_fd >= 0) {
-                tcpinfo *pInfo = Create_tcpinfo(client_fd, 0);
+                tcpinfo *pInfo = all_tcpinfo_hashtable[client_fd];
                 if (pInfo) {
                     Add_tcpinfo_to_queue(accept_queue, pInfo);
                 } else {
-                    close(client_fd); // 内存分配失败，销毁fd
+                    close(client_fd);   // 这个连接来源有问题
                 }
             }
         }
 
-        // 如果没有事件就让出CPU
-        if (ret <= 0) {
-            sched_yield();
+        // 检查close
+        FD_ZERO(&read_fds);
+        FD_SET(recv_from_Worker_Process_Socket_close, &read_fds);
+
+        tv.tv_sec = 0;
+        tv.tv_usec = 0; // 非阻塞检查
+
+        ret = select(recv_from_Worker_Process_Socket_close + 1, &read_fds, NULL, NULL, &tv);
+        if (ret > 0 && FD_ISSET(recv_from_Worker_Process_Socket_close, &read_fds)) {
+            int client_fd = fd_recv(recv_from_Worker_Process_Socket_close);
+            if (client_fd >= 0) {
+                tcpinfo *pInfo = all_tcpinfo_hashtable[client_fd];
+                if (pInfo) {
+                    // 需要关闭，删除其在哈希表中的映射
+                    all_tcpinfo_hashtable[client_fd] = NULL;
+                    Destroy_tcpinfo(pInfo);
+                } else {
+                    close(client_fd);   // 这个连接来源有问题
+                }
+            }
         }
+
+        usleep(100 * 1000); // 100ms轮询一次
     }
 
     pthread_exit(NULL);
@@ -726,14 +841,22 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to connect to Manager_Process.\n");
         return -1;
     }
-    recv_from_Worker_Process_Socket = fd_recv(Daemon_Main_Socket);
-    if (send_to_Manager_Process_Socket < 0) {
+    recv_from_Worker_Process_Socket_keep_alive = fd_recv(Daemon_Main_Socket);
+    recv_from_Worker_Process_Socket_close = fd_recv(Daemon_Main_Socket);
+    if ((recv_from_Worker_Process_Socket_keep_alive < 0) || (recv_from_Worker_Process_Socket_close < 0)) {
         fprintf(stderr, "Failed to connect to Worker_Process.\n");
         return -1;
     }
 
     keep_running = 1;
     second_flag = 0;
+
+    all_tcpinfo_hashtable = (tcpinfo**)malloc(sizeof(tcpinfo*) * all_tcpinfo_hashtable_size);
+    if(!all_tcpinfo_hashtable) {
+        fprintf(stderr, "Failed to create all_tcpinfo_hashtable.\n");
+        return -1;
+    }
+    memset(all_tcpinfo_hashtable, 0, sizeof(tcpinfo*) * all_tcpinfo_hashtable_size);
 
     // 创建工作队列
     accept_queue = Create_tcpinfo_queue();
@@ -875,7 +998,8 @@ heartbeat_report:
 
     // 清理自己持有的所有socket
     close(send_to_Manager_Process_Socket);
-    close(recv_from_Worker_Process_Socket);
+    close(recv_from_Worker_Process_Socket_keep_alive);
+    close(recv_from_Worker_Process_Socket_close);
     close(Daemon_Main_Socket);
 
     printf("[INFO] WebServer_Listener exit.\n");

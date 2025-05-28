@@ -171,7 +171,9 @@ clientinfo_queue *done_queue = NULL;
 int Manager_Socket = -1;
 
 // 发处理完成的TCP连接给监听进程重新入池
-int send_to_Listener_Process_Socket = -1;
+int send_to_Listener_Process_Socket_keep_alive = -1;
+// 发处理完成的TCP连接给监听进程关掉
+int send_to_Listener_Process_Socket_close = -1;
 
 // 从管理进程接收需要处理的TCP连接
 int recv_from_Manager_Process_Socket = -1;
@@ -297,6 +299,8 @@ void handle_http_request() {
             }
         }
     }
+    // 操作完成，关闭写流（不然没法close）
+    shutdown(pInfo->client_socket, SHUT_WR);
     // 统一操作，把完成操作的客户信息装入队列，判断是否要发回去
     Add_clientinfo_to_queue(done_queue, pInfo);
 }
@@ -307,12 +311,15 @@ void *SendToListenerThread(void *arg) {
         clientinfo *info = Remove_clientinfo_from_queue(done_queue);
         if (info) {
             if (info->keep_alive) {
-                // keep_alive才需要发回去，否则不需要
-                if (fd_send(send_to_Listener_Process_Socket, info->client_socket) < 0) {
-                    perror("[ERROR] Failed to send fd to Manager (Worker)");
+                if (fd_send(send_to_Listener_Process_Socket_keep_alive, info->client_socket) < 0) {
+                    perror("[ERROR] Failed to send fd to Manager (Worker1)");
+                }
+            } else {
+                if (fd_send(send_to_Listener_Process_Socket_close, info->client_socket) < 0) {
+                    perror("[ERROR] Failed to send fd to Manager (Worker2)");
                 }
             }
-            // 不管发不发，反正处理完成的就全部关闭了
+            // 处理完成的就全部关闭了
             Destroy_clientinfo(info);
         } else {
             sched_yield();  // 队列为空时让出CPU
@@ -368,17 +375,17 @@ void *WorkThread(void *arg) {
 
 int main(int argc, char *argv[]) {
     // 参数校验
-    if (argc < 3) {
+    if (argc < 4) {
         fprintf(stderr, "[ERROR] No file descriptor passed as argument\n");
         exit(1);
     }
 
-    Manager_Socket = atoi(argv[1]);                     // 将传递的文件描述符转换为整数
-    send_to_Listener_Process_Socket = atoi(argv[2]);    // 将传递的文件描述符转换为整数
+    Manager_Socket = atoi(argv[1]);                                 // 将传递的文件描述符转换为整数
+    send_to_Listener_Process_Socket_keep_alive = atoi(argv[2]);     // 将传递的文件描述符转换为整数
+    send_to_Listener_Process_Socket_close = atoi(argv[3]);          // 将传递的文件描述符转换为整数
 
     // 使用传递过来的文件描述符，进行后续的监听或通信
     printf("[INFO] Worker Received Manager_Socket: %d\n", Manager_Socket);
-    printf("[INFO] Worker Received send_to_Listener_Process_Socket: %d\n", send_to_Listener_Process_Socket);
 
     recv_from_Manager_Process_Socket = fd_recv(Manager_Socket);
     if (recv_from_Manager_Process_Socket < 0) {
@@ -445,7 +452,8 @@ int main(int argc, char *argv[]) {
     Destroy_clientinfo_queue(done_queue);
 
     // 清理自己持有的所有socket
-    close(send_to_Listener_Process_Socket);
+    close(send_to_Listener_Process_Socket_keep_alive);
+    close(send_to_Listener_Process_Socket_close);
     close(recv_from_Manager_Process_Socket);
     close(Manager_Socket);
 

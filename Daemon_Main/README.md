@@ -5,66 +5,26 @@ Daemon_Main 是 WebServer 的作为守护进程和主进程的程序。
 ## 1. 守护进程与功能进程之间的关系示意（ASCII图）
 
 ```
-===========================================================
-[1] Daemon ⇄ Function Process (Listener / Manager)
-===========================================================
-
-+------------------------------+
-|        Daemon Process        |     << parent >>
-|     WebServer_Daemon_Main    |
-|------------------------------|
-|                              |
-| 1. Create socketpair:        |
-|     ┌────────────────────┐   |
-|     │  [fd1] <-> [fd2]   │   |  ← used for full-duplex
-|     └────────────────────┘   |
-|                              |
-| 2. fork()                    |
-|     ┌────────────────────┐
-|     │   Child Process    │ ← PID ≠ 0
-|     └────────────────────┘
-|                              |
-| 3. In child:                 |
-|     - exec("./Listener")     |
-|       or exec("./Manager")   |
-|     - Inherits one end of    |
-|       socketpair (e.g., fd2) |
-|                              |
-| 4. In parent:                |
-|     - Keeps fd1              |
-|     - Monitors child via     |
-|       recv_status_message()  |
-|     - Sends shutdown command |
-|       via send_status_message()
-|     - Waits for exit (waitpid)
-|     - Restarts child if needed
-+-----------------------------+
-         ▲                ▲
-         |                |
-         |                |
-         |                |
-         |    Heartbeat   |
-         |  StatusMessage |
-         |    (every sec) |
-         |                |
-         |                |
-         |   Control Msg  |
-         | (shutdown / ok)|
-         ▼                ▼
-+------------------------------+
-|     Function Process         |  << child >>
-|   WebServer_Listener /       |
-|   WebServer_Manager          |
-|------------------------------|
-|                              |
-| - Receives fd via exec arg   |
-| - Uses socketpair with Daemon|
-|   to send status regularly   |
-| - On shutdown msg: exits     |
-| - On crash: Daemon detects   |
-|   (heartbeat timeout or SIGCHLD)
-+-----------------------------+
-
+                +------------------------+
+                |     Daemon Process     | 
+                |  (Monitors & Manages)  |
+                +------------------------+
+                        |
+              +---------+---------+
+              |                   |
+     +----------------+    +------------------+
+     | Listener Proc  |    |   Manager Proc   |
+     | (Accepts TCP   |    | (Manages Worker  |
+     | Connections)   |    |  Pool & Task     |
+     +----------------+    |  Distribution)   |
+              |            +------------------+
+              |                   |
+              +-------------------+--------------------+
+                                      |
+                              +------------------------+
+                              |  Worker Process (Pool) |
+                              | (Handles HTTP Requests)|
+                              +------------------------+
 
 ```
 
@@ -256,4 +216,35 @@ fd_send(daemon_sock, listener_recv_manager_send.sock1);
 pid = fork();
 execl("./Listener", "WebServer_Listener", fd_str, NULL);
 ```
+## 3. 守护进程的工作流
 
+```
+                                +-----------------------+
+                                |     Daemon Process    |
+                                |  (Monitors & Manages) |
+                                +-----------------------+
+                                          |
+            +-----------------------------+-----------------------------+
+            |                             |                             |
++-------------------+        +------------------------+       +--------------------+
+|  Listener Proc    |        |   Manager Proc         |       |    Worker Proc     |
+|  (TCP Listener)   |        |  (Task & Worker Mgmt)  |       |  (Handles Requests)|
++-------------------+        +------------------------+       +--------------------+
+            |                             |                             |
+    +-------------------+          +------------------+          +------------------+
+    |Listener-to-Manager| <------> |Manager-to-Worker | <------> |Worker-to-Listener|
+    |Socket Pair        |          | Socket Pair      |          | Socket Pair      |
+    +-------------------+          +------------------+          +------------------+
+            |                             |
+            +-----------------------------+
+                        |
+            +----------------------------+
+            |   Heartbeat Monitoring     |
+            |    (Daemon Monitors State) |
+            +----------------------------+
+                        |
+            +----------------------------+
+            |  Restart Process if Timeout |
+            +----------------------------+
+
+```

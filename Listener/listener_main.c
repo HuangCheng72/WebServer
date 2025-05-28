@@ -3,9 +3,10 @@
 //
 
 /**
- * 监听线程的设计用途：
- * 1. 监听TCP连接
- * 2. 管理TCP连接。有数据时传给管理进程，让管理进程分配处理。管理进程处理完毕又送回来。超时关闭。
+ * 设计变更总原则：TCP连接流动的方向改为单向流动，方向为：Listener -> Manager -> Workers -> Listener
+ * Manager对Worker是一对多
+ * Worker对Listener是多对一
+ *
  */
 
 /**
@@ -61,7 +62,10 @@ tcpinfo *Create_tcpinfo(int client_socket, unsigned int timeout) {
  * @param pInfo
  */
 void Destroy_tcpinfo(tcpinfo *pInfo) {
-    list_del(&pInfo->node);     // 删除结点，防止影响到其前后的结点
+    // 这里被销毁之前已经删除过了，再次删除就会出现NULL->prev和NULL->next的情况
+    if (!pInfo){
+        return;
+    }
     if(pInfo->client_socket > -1) {
         close(pInfo->client_socket);
     }
@@ -642,9 +646,11 @@ void* tcppool_manage_thread(void* arg) {
     pthread_exit(NULL);
 }
 
-// 这是与管理进程交互的两个Socket
+// 与管理进程交互的Socket
 int send_to_Manager_Process_Socket = -1;
-int recv_from_Manager_Process_Socket = -1;
+
+// 从工作进程接收处理完毕的Socket
+int recv_from_Worker_Process_Socket = -1;
 
 // 将release队列中的tcp连接信息发到管理进程
 void *SendToManagerThread(void *arg) {
@@ -663,23 +669,22 @@ void *SendToManagerThread(void *arg) {
     pthread_exit(NULL);
 }
 
-// 从管理进程接收socket，放入accept队列中，等待进入连接池
-void *RecvFromManagerThread(void *arg) {
+// 从工作进程接收socket，放入accept队列中，等待进入连接池
+void *RecvFromWorkerThread(void *arg) {
     struct timeval tv;
     fd_set read_fds;
 
     while (keep_running) {
         FD_ZERO(&read_fds);
-        FD_SET(recv_from_Manager_Process_Socket, &read_fds);
+        FD_SET(recv_from_Worker_Process_Socket, &read_fds);
 
         tv.tv_sec = 0;
         tv.tv_usec = 0; // 非阻塞检查
 
-        int ret = select(recv_from_Manager_Process_Socket + 1, &read_fds, NULL, NULL, &tv);
-        if (ret > 0 && FD_ISSET(recv_from_Manager_Process_Socket, &read_fds)) {
-            int client_fd = fd_recv(recv_from_Manager_Process_Socket);
+        int ret = select(recv_from_Worker_Process_Socket + 1, &read_fds, NULL, NULL, &tv);
+        if (ret > 0 && FD_ISSET(recv_from_Worker_Process_Socket, &read_fds)) {
+            int client_fd = fd_recv(recv_from_Worker_Process_Socket);
             if (client_fd >= 0) {
-                set_non_blocking(client_fd);
                 tcpinfo *pInfo = Create_tcpinfo(client_fd, 0);
                 if (pInfo) {
                     Add_tcpinfo_to_queue(accept_queue, pInfo);
@@ -715,11 +720,15 @@ int main(int argc, char *argv[]) {
 
     // 如果能顺利连接，就能接收到守护进程发来的，给监听进程与管理进程的交互的Socket
     send_to_Manager_Process_Socket = fd_recv(Daemon_Main_Socket);
-    recv_from_Manager_Process_Socket = fd_recv(Daemon_Main_Socket);
 
     // 两个缺一不可
-    if (send_to_Manager_Process_Socket < 0 || recv_from_Manager_Process_Socket < 0) {
+    if (send_to_Manager_Process_Socket < 0) {
         fprintf(stderr, "Failed to connect to Manager_Process.\n");
+        return -1;
+    }
+    recv_from_Worker_Process_Socket = fd_recv(Daemon_Main_Socket);
+    if (send_to_Manager_Process_Socket < 0) {
+        fprintf(stderr, "Failed to connect to Worker_Process.\n");
         return -1;
     }
 
@@ -755,7 +764,7 @@ int main(int argc, char *argv[]) {
     pthread_create(&manage_thread, NULL, tcppool_manage_thread, pPOOL);
 
     pthread_t recv_thread, send_thread;
-    pthread_create(&recv_thread, NULL, RecvFromManagerThread, NULL);
+    pthread_create(&recv_thread, NULL, RecvFromWorkerThread, NULL);
     pthread_create(&send_thread, NULL, SendToManagerThread, NULL);
 
     struct timespec ts_target, ts_now;
@@ -866,7 +875,7 @@ heartbeat_report:
 
     // 清理自己持有的所有socket
     close(send_to_Manager_Process_Socket);
-    close(recv_from_Manager_Process_Socket);
+    close(recv_from_Worker_Process_Socket);
     close(Daemon_Main_Socket);
 
     printf("[INFO] WebServer_Listener exit.\n");

@@ -48,7 +48,10 @@ clientinfo *Create_clientinfo(int client_socket) {
  * @param pInfo 客户信息结构体指针
  */
 void Destroy_clientinfo(clientinfo *pInfo) {
-    list_del(&pInfo->node);     // 删除结点，防止影响到其前后的结点
+    // 这里被销毁之前已经删除过了，再次删除就会出现NULL->prev和NULL->next的情况
+    if (!pInfo){
+        return;
+    }
 
     if(pInfo->client_socket > -1) {
         close(pInfo->client_socket);
@@ -167,8 +170,10 @@ clientinfo_queue *done_queue = NULL;
 // 与管理进程通信的 socket（用于接收与管理进程交互的两个socket，以及上报心跳包）
 int Manager_Socket = -1;
 
-// 这是与管理进程交互的两个Socket
-int send_to_Manager_Process_Socket = -1;
+// 发处理完成的TCP连接给监听进程重新入池
+int send_to_Listener_Process_Socket = -1;
+
+// 从管理进程接收需要处理的TCP连接
 int recv_from_Manager_Process_Socket = -1;
 
 // 程序运行标志
@@ -296,14 +301,14 @@ void handle_http_request() {
     Add_clientinfo_to_queue(done_queue, pInfo);
 }
 
-// done队列的数据，从 send_to_Manager_Process_Socket 发出去
-void *SendToManagerThread(void *arg) {
+// done队列的数据，从 send_to_Listener_Process_Socket 发出去
+void *SendToListenerThread(void *arg) {
     while (keep_running) {
         clientinfo *info = Remove_clientinfo_from_queue(done_queue);
         if (info) {
             if (info->keep_alive) {
                 // keep_alive才需要发回去，否则不需要
-                if (fd_send(send_to_Manager_Process_Socket, info->client_socket) < 0) {
+                if (fd_send(send_to_Listener_Process_Socket, info->client_socket) < 0) {
                     perror("[ERROR] Failed to send fd to Manager (Worker)");
                 }
             }
@@ -363,20 +368,20 @@ void *WorkThread(void *arg) {
 
 int main(int argc, char *argv[]) {
     // 参数校验
-    if (argc < 2) {
+    if (argc < 3) {
         fprintf(stderr, "[ERROR] No file descriptor passed as argument\n");
         exit(1);
     }
 
-    Manager_Socket = atoi(argv[1]);  // 将传递的文件描述符转换为整数
+    Manager_Socket = atoi(argv[1]);                     // 将传递的文件描述符转换为整数
+    send_to_Listener_Process_Socket = atoi(argv[2]);    // 将传递的文件描述符转换为整数
 
     // 使用传递过来的文件描述符，进行后续的监听或通信
     printf("[INFO] Worker Received Manager_Socket: %d\n", Manager_Socket);
+    printf("[INFO] Worker Received send_to_Listener_Process_Socket: %d\n", send_to_Listener_Process_Socket);
 
-    // 接收与 Manager 的通信 socket
-    send_to_Manager_Process_Socket = fd_recv(Manager_Socket);
     recv_from_Manager_Process_Socket = fd_recv(Manager_Socket);
-    if (send_to_Manager_Process_Socket < 0 || recv_from_Manager_Process_Socket < 0) {
+    if (recv_from_Manager_Process_Socket < 0) {
         fprintf(stderr, "Worker failed to connect to Manager_Process.\n");
         return -1;
     }
@@ -389,7 +394,7 @@ int main(int argc, char *argv[]) {
 
     // 启动两个线程
     pthread_t send_thread, recv_thread, work_thread;
-    pthread_create(&send_thread, NULL, SendToManagerThread, NULL);
+    pthread_create(&send_thread, NULL, SendToListenerThread, NULL);
     pthread_create(&recv_thread, NULL, RecvFromManagerThread, NULL);
     pthread_create(&work_thread, NULL, WorkThread, NULL);
 
@@ -398,7 +403,7 @@ int main(int argc, char *argv[]) {
     struct timespec ts_target, ts_now;
     clock_gettime(CLOCK_MONOTONIC, &ts_target);
 
-    // 这里的status不上报任何有意义的信息，只作为心跳包使用
+    // 这里的status只上报pid这个有用的信息，其他情况下只作为心跳包使用
     StatusMessage status;
     status.module = 3;  // 代表worker
     status.pid = getpid();
@@ -440,7 +445,7 @@ int main(int argc, char *argv[]) {
     Destroy_clientinfo_queue(done_queue);
 
     // 清理自己持有的所有socket
-    close(send_to_Manager_Process_Socket);
+    close(send_to_Listener_Process_Socket);
     close(recv_from_Manager_Process_Socket);
     close(Manager_Socket);
 
